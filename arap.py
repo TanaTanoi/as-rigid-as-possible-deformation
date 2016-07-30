@@ -53,11 +53,16 @@ class Deformer:
     def readSelectionFile(self, filename):
         # The selection status of each vertex, where 0=fixed, 1=deformable-region, 2=handle
 
-        self.vertSelection = open(filename, 'r').read().strip().split("\n")
-
+        self.vertStatus = open(filename, 'r').read().strip().split("\n")
         # Remove any lines that aren't numbers
-        self.vertSelection = [line for line in self.vertSelection if omath.string_is_int(line)]
-        assert(len(self.vertSelection) == len(self.verts))
+        self.vertStatus = [line for line in self.vertStatus if omath.string_is_int(line)]
+
+        # Keep track of the IDs of the selected verts (i.e. verts with handles, status == 2)
+        self.selectedVerts = []
+        for i in range(0..len(self.vertStatus)):
+            if self.vertStatus[i] == 2:
+                self.vertStatus.append(i)
+        assert(len(self.vertStatus) == len(self.verts))
 
     # Reads the .def file and stores the inner matrix
     def readDeformationFile(self, filename):
@@ -70,8 +75,7 @@ class Deformer:
         self.deformationMatrix = np.matrix(";".join(defFileLines))
         print("Deformation matrix to apply")
         print(self.deformationMatrix)
-        assert(self.deformationMatrix.size == 4)
-
+        assert(self.deformationMatrix.size == 16)
 
     # Returns a set of IDs that are neighbours to this vertexID (not including the input ID)
     def neighboursOf(self, vertID):

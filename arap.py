@@ -53,11 +53,25 @@ class Deformer:
     def readSelectionFile(self, filename):
         # The selection status of each vertex, where 0=fixed, 1=deformable-region, 2=handle
 
-        self.vertSelection = open(filename, 'r').read().split("\n")
+        self.vertSelection = open(filename, 'r').read().strip().split("\n")
 
         # Remove any lines that aren't numbers
         self.vertSelection = [line for line in self.vertSelection if omath.string_is_int(line)]
         assert(len(self.vertSelection) == len(self.verts))
+
+    # Reads the .def file and stores the inner matrix
+    def readDeformationFile(self, filename):
+        defFileLines = open(filename, 'r').read().strip().split("\n")
+        # Remove any lines with comments
+        defFileLines = [line for line in defFileLines if "#" not in line]
+
+        # Assert its at least a 4 by something matrix just in case
+        assert(len(defFileLines) == 4)
+        self.deformationMatrix = np.matrix(";".join(defFileLines))
+        print("Deformation matrix to apply")
+        print(self.deformationMatrix)
+        assert(self.deformationMatrix.size == 4)
+
 
     # Returns a set of IDs that are neighbours to this vertexID (not including the input ID)
     def neighboursOf(self, vertID):
@@ -111,12 +125,17 @@ class Deformer:
 # MAIN
 filename = "data/02-bar-twist/00-bar-original.off"
 selection_filename = "data/02-bar-twist/bar.sel"
+deformation_file = "data/02-bar-twist/bar.def"
 
 if(len(sys.argv) > 1):
     filename = sys.argv[1]
 if(len(sys.argv) > 2):
     selection_filename = sys.argv[2]
+if(len(sys.argv) > 3):
+    deformation_file = sys.argv[3]
+
 d = Deformer(filename)
 d.readFile()
 d.readSelectionFile(selection_filename)
+d.readDeformationFile(deformation_file)
 d.buildWeightMatrix()

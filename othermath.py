@@ -6,3 +6,10 @@ def angleBetween(vector_a, vector_b):
 
 def cot(theta):
     return math.cos(theta) / math.sin(theta)
+
+def string_is_int(string):
+    try:
+        int(string)
+        return True
+    except ValueError:
+        return False

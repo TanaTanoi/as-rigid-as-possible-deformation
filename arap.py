@@ -49,6 +49,16 @@ class Deformer:
         print(str(len(self.faces)) + " faces")
         print(str(number_of_edges) + " edges")
 
+    # Reads the .sel file and keeps track of the selection status of a vertex
+    def readSelectionFile(self, filename):
+        # The selection status of each vertex, where 0=fixed, 1=deformable-region, 2=handle
+
+        self.vertSelection = open(filename, 'r').read().split("\n")
+
+        # Remove any lines that aren't numbers
+        self.vertSelection = [line for line in self.vertSelection if omath.string_is_int(line)]
+        assert(len(self.vertSelection) == len(self.verts))
+
     # Returns a set of IDs that are neighbours to this vertexID (not including the input ID)
     def neighboursOf(self, vertID):
         neighbours = []
@@ -70,11 +80,9 @@ class Deformer:
         for vertex_id in range(number_of_verticies):
             for neighbour_id in self.neighboursOf(vertex_id):
                 self.assignWeightForPair(vertex_id, neighbour_id)
-        print("Weight matrix size of " + str(len(self.weightMatrix)))
 
     def assignWeightForPair(self, i, j):
         weightIJ = self.weightForPair(i, j)
-        print("weight for ", i, ",",j, "-> ", weightIJ)
         self.weightMatrix[i][j] = weightIJ
 
     def weightForPair(self, i, j):
@@ -102,9 +110,13 @@ class Deformer:
 
 # MAIN
 filename = "data/02-bar-twist/00-bar-original.off"
+selection_filename = "data/02-bar-twist/bar.sel"
 
 if(len(sys.argv) > 1):
     filename = sys.argv[1]
+if(len(sys.argv) > 2):
+    selection_filename = sys.argv[2]
 d = Deformer(filename)
 d.readFile()
+d.readSelectionFile(selection_filename)
 d.buildWeightMatrix()

@@ -5,7 +5,14 @@ class Face:
         self.v3 = v3
 
     def containsPointIDs(self, i, j):
-        return i in vertexIDs and j in vertexIDs
+        vIDs = self.vertexIDs()
+        return i in vIDs and j in vIDs
 
-    def vertexIDs():
+    def otherPoint(self, i, j):
+        vIDs = set(self.vertexIDs())
+        vIDs.remove(i)
+        vIDs.remove(j)
+        return vIDs.pop()
+
+    def vertexIDs(self):
         return [self.v1, self.v2, self.v3]

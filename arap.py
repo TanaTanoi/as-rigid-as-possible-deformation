@@ -3,6 +3,7 @@ import numpy as np
 import math
 import face
 import offfile
+import othermath as omath
 
 # Read file into arrays
 class Deformer:
@@ -51,11 +52,13 @@ class Deformer:
     # Returns a set of IDs that are neighbours to this vertexID (not including the input ID)
     def neighboursOf(self, vertID):
         neighbours = []
-        for face in self.vertsToFaces[vertID]:
-            for vID in face.vertexIDs:
+        for faceID in self.vertsToFaces[vertID]:
+            face = self.faces[faceID]
+            for vID in face.vertexIDs():
                 neighbours.append(vID)
         neighbours = set(neighbours)
-        return neighbours.remove(vertID)
+        neighbours.remove(vertID)
+        return neighbours
 
     def buildWeightMatrix(self):
         number_of_verticies = len(self.verts)
@@ -63,25 +66,39 @@ class Deformer:
         self.weightMatrix = [
             [ None for i in range(number_of_verticies) ]
         ] * number_of_verticies
-
-        for vertex_id in number_of_verticies:
-            for neighbour_id in neighboursOf(vertex_id):
-                assignWeightForPair(vertex_id, neighbour_id)
+        self.x = 1
+        for vertex_id in range(number_of_verticies):
+            for neighbour_id in self.neighboursOf(vertex_id):
+                self.assignWeightForPair(vertex_id, neighbour_id)
+        print("Weight matrix size of " + str(len(self.weightMatrix)))
 
     def assignWeightForPair(self, i, j):
-
-        self.weightMatrix[i][j]
+        weightIJ = self.weightForPair(i, j)
+        print("weight for ", i, ",",j, "-> ", weightIJ)
+        self.weightMatrix[i][j] = weightIJ
 
     def weightForPair(self, i, j):
-        faces = []
+        local_faces = []
         for f_id in self.vertsToFaces[i]:
             face = self.faces[f_id]
             if face.containsPointIDs(i, j):
-                faces.apped(face)
-        #If there's more than two, we have a problem, or mesh is bad
-        assert(len(faces) == 2)
+                local_faces.append(face)
 
-        
+        # Either a normal face or a boundry edge, otherwise bad mesh
+        assert(len(local_faces) <= 2)
+
+        vertex_i = self.verts[i]
+        vertex_j = self.verts[j]
+
+        # weight equation: (tan(theta_1 / 2) + tan(theta_2 / 2) / ||v_i - v_j||)
+
+        tan_theta_sum = 0
+        for face in local_faces:
+            otherVertexID = face.otherPoint(i, j)
+            vertex_o = self.verts[otherVertexID]
+            theta = omath.angleBetween(vertex_j - vertex_i, vertex_o - vertex_i)
+            tan_theta_sum += math.tan(theta / 2)
+        return tan_theta_sum / (np.linalg.norm(vertex_i - vertex_j))
 
 # MAIN
 filename = "data/02-bar-twist/00-bar-original.off"

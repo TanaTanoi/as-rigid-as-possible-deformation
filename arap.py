@@ -100,7 +100,10 @@ class Deformer:
         print("Matix complete. ", len(self.weightMatrix)**2, " entries")
 
     def assignWeightForPair(self, i, j):
-        weightIJ = self.weightForPair(i, j)
+        if(self.weightMatrix[j][i] == 0):
+            weightIJ = self.weightForPair(i, j)
+        else:
+            weightIJ = self.weightMatrix[j][i]
         self.weightMatrix[i][j] = weightIJ
 
     def weightForPair(self, i, j):

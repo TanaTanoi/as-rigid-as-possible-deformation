@@ -117,15 +117,15 @@ class Deformer:
         vertex_i = self.verts[i]
         vertex_j = self.verts[j]
 
-        # weight equation: (tan(theta_1 / 2) + tan(theta_2 / 2) / ||v_i - v_j||)
+        # weight equation: 0.5 * (cot(alpha) + cot(beta)
 
-        tan_theta_sum = 0
+        cot_theta_sum = 0
         for face in local_faces:
             otherVertexID = face.otherPoint(i, j)
             vertex_o = self.verts[otherVertexID]
-            theta = omath.angleBetween(vertex_j - vertex_i, vertex_o - vertex_i)
-            tan_theta_sum += math.tan(theta / 2)
-        return tan_theta_sum / (np.linalg.norm(vertex_i - vertex_j))
+            theta = omath.angleBetween(vertex_j - vertex_o, vertex_i - vertex_o)
+            cot_theta_sum += omath.cot(theta)
+        return cot_theta_sum * 0.5
 
 # MAIN
 filename = "data/02-bar-twist/00-bar-original.off"

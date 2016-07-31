@@ -57,7 +57,7 @@ class Deformer:
         # Remove any lines that aren't numbers
         self.vertStatus = [line for line in self.vertStatus if omath.string_is_int(line)]
 
-        # Keep track of the IDs of the selected verts (i.e. verts with handles, status == 2)
+        # Keep track of the IDs of the selected verts (i.e. verts with handles/status == 2)
         self.selectedVerts = []
         for i in range(0..len(self.vertStatus)):
             if self.vertStatus[i] == 2:
@@ -98,6 +98,9 @@ class Deformer:
         for vertex_id in range(number_of_verticies):
             for neighbour_id in self.neighboursOf(vertex_id):
                 self.assignWeightForPair(vertex_id, neighbour_id)
+        print("Weight between 0 and 2: ", self.weightMatrix[0][2])
+        for line in self.weightMatrix:
+            print(line)
 
     def assignWeightForPair(self, i, j):
         weightIJ = self.weightForPair(i, j)
@@ -131,15 +134,21 @@ filename = "data/02-bar-twist/00-bar-original.off"
 selection_filename = "data/02-bar-twist/bar.sel"
 deformation_file = "data/02-bar-twist/bar.def"
 
-if(len(sys.argv) > 1):
+argc = len(sys.argv)
+
+if(argc > 1):
     filename = sys.argv[1]
-if(len(sys.argv) > 2):
+    selection_filename = ""
+    deformation_file = ""
+if(argc > 2):
     selection_filename = sys.argv[2]
-if(len(sys.argv) > 3):
+    deformation_file = ""
+if(argc > 3):
     deformation_file = sys.argv[3]
 
 d = Deformer(filename)
 d.readFile()
-d.readSelectionFile(selection_filename)
-d.readDeformationFile(deformation_file)
+if argc > 2:
+    d.readSelectionFile(selection_filename)
+    d.readDeformationFile(deformation_file)
 d.buildWeightMatrix()

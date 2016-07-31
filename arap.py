@@ -92,15 +92,11 @@ class Deformer:
         number_of_verticies = len(self.verts)
 
         self.weightMatrix = [
-            [ None for i in range(number_of_verticies) ]
-        ] * number_of_verticies
-        self.x = 1
+            [ 0 for i in range(number_of_verticies) ] for j in range(number_of_verticies)
+        ]
         for vertex_id in range(number_of_verticies):
             for neighbour_id in self.neighboursOf(vertex_id):
                 self.assignWeightForPair(vertex_id, neighbour_id)
-        print("Weight between 0 and 2: ", self.weightMatrix[0][2])
-        for line in self.weightMatrix:
-            print(line)
 
     def assignWeightForPair(self, i, j):
         weightIJ = self.weightForPair(i, j)
@@ -108,8 +104,10 @@ class Deformer:
 
     def weightForPair(self, i, j):
         local_faces = []
+        # For every face associated with vert index I,
         for f_id in self.vertsToFaces[i]:
             face = self.faces[f_id]
+            # If the face contains both I and J, add it
             if face.containsPointIDs(i, j):
                 local_faces.append(face)
 

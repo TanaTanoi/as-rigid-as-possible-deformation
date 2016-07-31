@@ -59,9 +59,9 @@ class Deformer:
 
         # Keep track of the IDs of the selected verts (i.e. verts with handles/status == 2)
         self.selectedVerts = []
-        for i in range(0..len(self.vertStatus)):
+        for i in range(0, len(self.vertStatus)):
             if self.vertStatus[i] == 2:
-                self.vertStatus.append(i)
+                self.selectedVerts.append(i)
         assert(len(self.vertStatus) == len(self.verts))
 
     # Reads the .def file and stores the inner matrix
@@ -97,6 +97,7 @@ class Deformer:
         for vertex_id in range(number_of_verticies):
             for neighbour_id in self.neighboursOf(vertex_id):
                 self.assignWeightForPair(vertex_id, neighbour_id)
+        print("Matix complete. ", len(self.weightMatrix)**2, " entries")
 
     def assignWeightForPair(self, i, j):
         weightIJ = self.weightForPair(i, j)
@@ -146,7 +147,7 @@ if(argc > 3):
 
 d = Deformer(filename)
 d.readFile()
-if argc > 2:
+if len(selection_filename) > 0:
     d.readSelectionFile(selection_filename)
     d.readDeformationFile(deformation_file)
 d.buildWeightMatrix()

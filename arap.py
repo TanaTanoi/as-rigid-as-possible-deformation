@@ -21,6 +21,7 @@ class Deformer:
 
         # Every vertex in the .off
         self.verts = []
+        self.vertsPrime = []
         # Every face in the .off
         self.faces = []
         # The ID of the faces related to this vertx ID (i.e. vtf[i] contains faces that contain ID i)
@@ -32,6 +33,8 @@ class Deformer:
             y = float(vert_line[1])
             z = float(vert_line[2])
             self.verts.append(np.array([x, y, z]))
+            self.vertsPrime.append(np.array([x, y, z]))
+
             self.vertsToFaces.append([])
 
         for i in range(0, number_of_faces):
@@ -131,6 +134,11 @@ class Deformer:
             cot_theta_sum += omath.cot(theta)
         return cot_theta_sum * 0.5
 
+    def apply_deformation(self):
+        for vert_id in self.selectedVerts:
+            vert = self.verts[vert_id]
+            self.vertsPrime[vert_id] = self.deformationMatrix * vert
+
 # MAIN
 filename = "data/02-bar-twist/00-bar-original.off"
 selection_filename = "data/02-bar-twist/bar.sel"
@@ -154,3 +162,4 @@ if len(selection_filename) > 0:
     d.readSelectionFile(selection_filename)
     d.readDeformationFile(deformation_file)
 d.buildWeightMatrix()
+d.apply_deformation()

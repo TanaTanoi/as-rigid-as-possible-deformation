@@ -58,7 +58,7 @@ class Deformer:
 
         self.vertStatus = open(filename, 'r').read().strip().split("\n")
         # Remove any lines that aren't numbers
-        self.vertStatus = [line for line in self.vertStatus if omath.string_is_int(line)]
+        self.vertStatus = [int(line) for line in self.vertStatus if omath.string_is_int(line)]
 
         # Keep track of the IDs of the selected verts (i.e. verts with handles/status == 2)
         self.selectedVerts = []
@@ -135,9 +135,40 @@ class Deformer:
         return cot_theta_sum * 0.5
 
     def apply_deformation(self):
+        print("Length of sel verts", len(self.selectedVerts))
         for vert_id in self.selectedVerts:
             vert = self.verts[vert_id]
-            self.vertsPrime[vert_id] = self.deformationMatrix * vert
+            # 4x4 by 1x4
+            x = np.append(vert, 0) * self.deformationMatrix
+            # then remove last element
+            self.vertsPrime[vert_id] = np.squeeze(np.asarray(np.delete(x, 3)))
+            self.calculate_rotation_matrix_for_cell(vert_id)
+
+    def calculate_rotation_matrix_for_cell(self, vert_id):
+        covariance_matrix = self.calculate_covariance_matrix_for_cell(vert_id)
+
+        U, s, V =np.linalg.svd(covariance_matrix, full_matrices=True)
+        return V * U.transpose()
+
+    def calculate_covariance_matrix_for_cell(self, vert_id):
+        #s_i = P_i * D_i * P_i_prime_transpose
+        vert_i = self.verts[vert_id]
+        vert_i_prime = self.vertsPrime[vert_id]
+
+        neighbour_ids = self.neighboursOf(vert_id)
+        D_i = np.diag(np.array([ self.weightMatrix[vert_id][n_id] for n_id in neighbour_ids ]))
+        P_i = []
+        P_i_prime = []
+        for j in neighbour_ids:
+            vert_j = self.verts[j]
+            P_i.append(vert_i - vert_j)
+
+            vert_j_prime = self.vertsPrime[j]
+            P_i_prime.append(vert_i_prime - vert_j_prime)
+        P_i = np.matrix(P_i).transpose()
+        P_i_prime = np.matrix(P_i_prime).transpose()
+
+        return P_i * D_i * P_i_prime.transpose()
 
 # MAIN
 filename = "data/02-bar-twist/00-bar-original.off"

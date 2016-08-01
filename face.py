@@ -16,3 +16,6 @@ class Face:
 
     def vertexIDs(self):
         return [self.v1, self.v2, self.v3]
+
+    def off_string(self):
+        return "3 " + str(self.v1) + " " + str(self.v2) + " " + str(self.v3)

@@ -8,6 +8,6 @@ class OffFile:
     # Grabs the next line, ignoring comments
     def nextLine(self):
         line = self.lines.pop(0)
-        while(line[0] == '#'):
+        while(len(line) == 0 or line[0] == '#'):
             line = self.lines.pop(0)
         return line

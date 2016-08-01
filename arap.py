@@ -104,6 +104,7 @@ class Deformer:
 
     def assignWeightForPair(self, i, j):
         if(self.weightMatrix[j][i] == 0):
+            # If the opposite weight has not been computed, do so
             weightIJ = self.weightForPair(i, j)
         else:
             weightIJ = self.weightMatrix[j][i]
@@ -136,19 +137,31 @@ class Deformer:
 
     def apply_deformation(self):
         print("Length of sel verts", len(self.selectedVerts))
+        # Apply first deformation
         for vert_id in self.selectedVerts:
             vert = self.verts[vert_id]
-            # 4x4 by 1x4
-            x = np.append(vert, 0) * self.deformationMatrix
-            # then remove last element
-            self.vertsPrime[vert_id] = np.squeeze(np.asarray(np.delete(x, 3)))
-            self.calculate_rotation_matrix_for_cell(vert_id)
+            self.vertsPrime[vert_id] = omath.apply_rotation(self.deformationMatrix, vert)
+
+        self.cellRotations = []
+        # Calculate and apply rotations for each cell TODO MOVE SOMEWHERE ELSE
+        for vert_id in range(0, len(self.verts)):
+            if(self.vertStatus[vert_id] != 0):
+                rotation = self.calculate_rotation_matrix_for_cell(vert_id)
+            else:
+                rotation = np.identity(3)
+            vert = self.verts[vert_id]
+
+            self.cellRotations.append(rotation)
+        for vert_id in range(0, len(self.verts)):
+            self.vertsPrime[vert_id] = omath.apply_rotation(self.cellRotations[vert_id], self.verts[vert_id])
 
     def calculate_rotation_matrix_for_cell(self, vert_id):
         covariance_matrix = self.calculate_covariance_matrix_for_cell(vert_id)
 
-        U, s, V =np.linalg.svd(covariance_matrix, full_matrices=True)
-        return V * U.transpose()
+        U, s, V = np.linalg.svd(covariance_matrix, full_matrices=True)
+        # U, S, V_transpose
+        # V_transpose_transpose * U_transpose
+        return V.transpose() * U.transpose()
 
     def calculate_covariance_matrix_for_cell(self, vert_id):
         #s_i = P_i * D_i * P_i_prime_transpose
@@ -165,10 +178,24 @@ class Deformer:
 
             vert_j_prime = self.vertsPrime[j]
             P_i_prime.append(vert_i_prime - vert_j_prime)
-        P_i = np.matrix(P_i).transpose()
-        P_i_prime = np.matrix(P_i_prime).transpose()
 
-        return P_i * D_i * P_i_prime.transpose()
+        P_i = np.matrix(P_i).transpose()
+        P_i_prime = np.matrix(P_i_prime)
+
+        return P_i * D_i * P_i_prime
+
+    def output_s_prime_to_file(self):
+        f = open('output.off', 'w')
+        f.write("OFF\n")
+        f.write(str(len(self.verts)) + " " + str(len(self.faces)) + " 0\n")
+        for vert in self.vertsPrime:
+            for i in vert:
+                f.write(str(i) + " ")
+            f.write("\n")
+        for face in self.faces:
+            f.write(face.off_string() + "\n")
+        f.close()
+        print("Output file to `output.off`")
 
 # MAIN
 filename = "data/02-bar-twist/00-bar-original.off"
@@ -194,3 +221,4 @@ if len(selection_filename) > 0:
     d.readDeformationFile(deformation_file)
 d.buildWeightMatrix()
 d.apply_deformation()
+d.output_s_prime_to_file()

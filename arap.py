@@ -37,6 +37,9 @@ class Deformer:
 
             self.vertsToFaces.append([])
 
+        self.neighbour_matrix = [ [ 0 for x in range(0, number_of_verticies) ] for y in range(0, number_of_verticies) ]
+        self.neighbour_matrix = np.matrix(self.neighbour_matrix)
+
         for i in range(0, number_of_faces):
             faceLine = fr.nextLine().split()
             v1_id = int(faceLine[1])
@@ -44,13 +47,25 @@ class Deformer:
             v3_id = int(faceLine[3])
             self.faces.append(face.Face(v1_id, v2_id, v3_id))
             # Add this face to each vertex face map
+            self.assign_values_to_neighbour_matrix(v1_id, v2_id, v3_id)
             self.vertsToFaces[v1_id].append(i)
             self.vertsToFaces[v2_id].append(i)
             self.vertsToFaces[v3_id].append(i)
 
+
+        self.edge_matrix = np.diag([len(self.neighboursOf(x)) for x in range(0, len(self.verts))])
+        self.laplacian_matrix = self.edge_matrix - self.neighbour_matrix
         print(str(len(self.verts)) + " verticies")
         print(str(len(self.faces)) + " faces")
         print(str(number_of_edges) + " edges")
+
+    def assign_values_to_neighbour_matrix(self, v1, v2 ,v3):
+        self.neighbour_matrix[v1, v2] = 1
+        self.neighbour_matrix[v2, v1] = 1
+        self.neighbour_matrix[v1, v3] = 1
+        self.neighbour_matrix[v3, v1] = 1
+        self.neighbour_matrix[v2, v3] = 1
+        self.neighbour_matrix[v3, v2] = 1
 
     # Reads the .sel file and keeps track of the selection status of a vertex
     def readSelectionFile(self, filename):
@@ -81,14 +96,11 @@ class Deformer:
         assert(self.deformationMatrix.size == 16)
 
     # Returns a set of IDs that are neighbours to this vertexID (not including the input ID)
-    def neighboursOf(self, vertID):
+    def neighboursOf(self, vert_id):
         neighbours = []
-        for faceID in self.vertsToFaces[vertID]:
-            face = self.faces[faceID]
-            for vID in face.vertexIDs():
-                neighbours.append(vID)
-        neighbours = set(neighbours)
-        neighbours.remove(vertID)
+        for n_id in range(0, len(self.verts)):
+            if(self.neighbour_matrix[vert_id, n_id] == 1):
+                neighbours.append(n_id)
         return neighbours
 
     def buildWeightMatrix(self):

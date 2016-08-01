@@ -13,3 +13,15 @@ def string_is_int(string):
         return True
     except ValueError:
         return False
+
+# Apply the 4x4 matrix to the 1x3 vector
+def apply_rotation(rotation_matrix, vector):
+    is_4_by_4 = rotation_matrix.size == 16
+    if(is_4_by_4):
+        vector = np.append(vector, 1)
+    vector = rotation_matrix * np.matrix(vector).transpose()
+    vector = vector.transpose()
+    if(is_4_by_4):
+        # then remove last element
+        vector = np.delete(vector, 3)
+    return np.squeeze(np.asarray(vector))

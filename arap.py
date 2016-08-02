@@ -19,6 +19,8 @@ class Deformer:
         number_of_faces =       int(first_line[1])
         number_of_edges =       int(first_line[2])
 
+        self.n = number_of_verticies
+
         # Every vertex in the .off
         self.verts = []
         self.verts_prime = []
@@ -27,7 +29,7 @@ class Deformer:
         # The ID of the faces related to this vertx ID (i.e. vtf[i] contains faces that contain ID i)
         self.verts_to_face = []
 
-        for i in range(0, number_of_verticies):
+        for i in range(self.n):
             vert_line = fr.nextLine().split()
             x = float(vert_line[0])
             y = float(vert_line[1])
@@ -37,11 +39,10 @@ class Deformer:
 
             self.verts_to_face.append([])
 
-        self.neighbour_matrix = [ [ 0 for x in range(0, number_of_verticies) ] for y in range(0, number_of_verticies) ]
-        self.neighbour_matrix = np.matrix(self.neighbour_matrix)
+        self.neighbour_matrix = np.zeros((self.n, self.n))
 
         print("Generating Adjacencies")
-        for i in range(0, number_of_faces):
+        for i in range(number_of_faces):
             face_line = fr.nextLine().split()
             v1_id = int(face_line[1])
             v2_id = int(face_line[2])
@@ -54,13 +55,14 @@ class Deformer:
             self.verts_to_face[v3_id].append(i)
 
         print("Generating Edge Matrix")
-        self.edge_matrix = np.zeros((number_of_verticies, number_of_verticies))
-        # TODO APPLY THIS TO OTHER STUFF ^^
-        for row in range(number_of_verticies):
+        self.edge_matrix = np.zeros((self.n, self.n))
+
+        for row in range(self.n):
             self.edge_matrix[row][row] = self.neighbour_matrix[row].sum()
         print("Generating Laplacian Matrix")
 
-        self.cell_rotations = [ 0 for i in range(number_of_verticies) ]
+        # N size array of 3x3 matricies
+        self.cell_rotations = np.zeros((self.n, 3, 3))
 
         print(str(len(self.verts)) + " verticies")
         print(str(len(self.faces)) + " faces")
@@ -86,7 +88,7 @@ class Deformer:
 
         # Keep track of the IDs of the selected verts (i.e. verts with handles/status == 2)
         self.selected_verts = []
-        for i in range(len(self.vert_status)):
+        for i in range(self.n):
             if self.vert_status[i] == 2:
                 self.selected_verts.append(i)
             # Apply laplacian constraints (i.e. fixed cells)
@@ -112,16 +114,14 @@ class Deformer:
     # Returns a set of IDs that are neighbours to this vertexID (not including the input ID)
     def neighbours_of(self, vert_id):
         neighbours = []
-        for n_id in range(0, len(self.verts)):
+        for n_id in range(self.n):
             if(self.neighbour_matrix[vert_id, n_id] == 1):
                 neighbours.append(n_id)
         return neighbours
 
     def build_weight_matrix(self):
-        number_of_verticies = len(self.verts)
-
-        self.weight_matrix = np.zeros((number_of_verticies, number_of_verticies))
-        for vertex_id in range(number_of_verticies):
+        self.weight_matrix = np.zeros((self.n, self.n))
+        for vertex_id in range(self.n):
             for neighbour_id in self.neighbours_of(vertex_id):
                 self.assign_weight_for_pair(vertex_id, neighbour_id)
         print("Matix complete. ", len(self.weight_matrix)**2, " entries")
@@ -160,25 +160,21 @@ class Deformer:
             cot_theta_sum += omath.cot(theta)
         return cot_theta_sum * 0.5
 
-    def apply_deformation(self):
+    def apply_deformation(self, iterations):
         print("Length of sel verts", len(self.selected_verts))
         # Apply first deformation
         for vert_id in self.selected_verts:
             vert = self.verts[vert_id]
             new_vert = omath.apply_rotation(self.deformation_matrix, vert)
             self.verts_prime[vert_id] = new_vert
-            for n_id in self.neighbours_of(vert_id):
-                vert = self.verts[n_id]
-                new_vert = omath.apply_rotation(self.deformation_matrix, vert)
-                self.verts_prime[n_id] = new_vert
-
-        for t in range(2):
+            print(vert_id, "'s neighbours ", self.neighbours_of(vert_id))
+        for t in range(iterations):
             print("Iteration: ", t)
             self.calculate_cell_rotations()
             self.apply_cell_rotations()
 
     def calculate_cell_rotations(self):
-        for vert_id in range(len(self.verts)):
+        for vert_id in range(self.n):
             if(self.vert_is_deformable(vert_id)):
                 rotation = self.calculate_rotation_matrix_for_cell(vert_id)
             else:
@@ -190,12 +186,10 @@ class Deformer:
         return self.vert_status[vert_id] == 1
 
     def apply_cell_rotations(self):
-        n = len(self.verts)
-
-        b_array = [ self.calculate_b_for(i) for i in range(n) ]
+        b_array = [ self.calculate_b_for(i) for i in range(self.n) ]
 
         # Incorporate constraints (10), effecivly erasing non-deformable rows/cols
-        for vert_id in range(n):
+        for vert_id in range(self.n):
             if(not self.vert_is_deformable(vert_id)):
                 b_array[vert_id] = self.verts_prime[vert_id]
 
@@ -280,5 +274,5 @@ if len(selection_filename) > 0:
     d.read_deformation_file(deformation_file)
 d.build_weight_matrix()
 # d.build_laplacian_matrix()
-d.apply_deformation()
+d.apply_deformation(3)
 d.output_s_prime_to_file()

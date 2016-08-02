@@ -4,7 +4,7 @@ import math
 import face
 import offfile
 import othermath as omath
-np.set_printoptions(precision=2)
+np.set_printoptions(precision=2, suppress=True)
 # Read file into arrays
 class Deformer:
     def __init__(self, filename):
@@ -167,7 +167,8 @@ class Deformer:
             vert = self.verts[vert_id]
             new_vert = omath.apply_rotation(self.deformation_matrix, vert)
             self.verts_prime[vert_id] = new_vert
-            print(vert_id, "'s neighbours ", self.neighbours_of(vert_id))
+
+        # Apply following deformation iterations
         for t in range(iterations):
             print("Iteration: ", t)
             self.calculate_cell_rotations()
@@ -175,10 +176,7 @@ class Deformer:
 
     def calculate_cell_rotations(self):
         for vert_id in range(self.n):
-            if(self.vert_is_deformable(vert_id)):
-                rotation = self.calculate_rotation_matrix_for_cell(vert_id)
-            else:
-                rotation = np.identity(3)
+            rotation = self.calculate_rotation_matrix_for_cell(vert_id)
 
             self.cell_rotations[vert_id] = rotation
 
@@ -188,7 +186,7 @@ class Deformer:
     def apply_cell_rotations(self):
         b_array = [ self.calculate_b_for(i) for i in range(self.n) ]
 
-        # Incorporate constraints (10), effecivly erasing non-deformable rows/cols
+        # Incorporate constraints (10), updating the right hand matrix with values c_k
         for vert_id in range(self.n):
             if(not self.vert_is_deformable(vert_id)):
                 b_array[vert_id] = self.verts_prime[vert_id]
@@ -206,7 +204,7 @@ class Deformer:
         return V_transpose.transpose() * U.transpose()
 
     def calculate_covariance_matrix_for_cell(self, vert_id):
-        #s_i = P_i * D_i * P_i_prime_transpose
+        # s_i = P_i * D_i * P_i_prime_transpose
         vert_i = self.verts[vert_id]
         vert_i_prime = self.verts_prime[vert_id]
 
@@ -251,9 +249,9 @@ class Deformer:
         return b
 
 # MAIN
-filename = "data/02-bar-twist/00-bar-original.off"
-selection_filename = "data/02-bar-twist/bar.sel"
-deformation_file = "data/02-bar-twist/bar.def"
+filename            = "data/02-bar-twist/00-bar-original.off"
+selection_filename  = "data/02-bar-twist/bar.sel"
+deformation_file    = "data/02-bar-twist/bar.def"
 
 argc = len(sys.argv)
 
@@ -273,6 +271,5 @@ if len(selection_filename) > 0:
     d.read_selection_file(selection_filename)
     d.read_deformation_file(deformation_file)
 d.build_weight_matrix()
-# d.build_laplacian_matrix()
-d.apply_deformation(3)
+d.apply_deformation(1)
 d.output_s_prime_to_file()

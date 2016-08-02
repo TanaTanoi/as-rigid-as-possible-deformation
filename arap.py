@@ -59,7 +59,8 @@ class Deformer:
         for row in range(number_of_verticies):
             self.edge_matrix[row][row] = self.neighbour_matrix[row].sum()
         print("Generating Laplacian Matrix")
-        self.laplacian_matrix = self.edge_matrix - self.neighbour_matrix
+
+        self.cell_rotations = [ 0 for i in range(number_of_verticies) ]
 
         print(str(len(self.verts)) + " verticies")
         print(str(len(self.faces)) + " faces")
@@ -81,11 +82,18 @@ class Deformer:
         # Remove any lines that aren't numbers
         self.vert_status = [int(line) for line in self.vert_status if omath.string_is_int(line)]
 
+        self.laplacian_matrix = self.edge_matrix - self.neighbour_matrix
+
         # Keep track of the IDs of the selected verts (i.e. verts with handles/status == 2)
         self.selected_verts = []
-        for i in range(0, len(self.vert_status)):
+        for i in range(len(self.vert_status)):
             if self.vert_status[i] == 2:
                 self.selected_verts.append(i)
+            # Apply laplacian constraints (i.e. fixed cells)
+            if(not self.vert_is_deformable(i)):
+                self.laplacian_matrix[i] = 0
+                self.laplacian_matrix[:, i] = 0
+                self.laplacian_matrix[i, i] = 1
         assert(len(self.vert_status) == len(self.verts))
 
     # Reads the .def file and stores the inner matrix
@@ -118,9 +126,6 @@ class Deformer:
                 self.assign_weight_for_pair(vertex_id, neighbour_id)
         print("Matix complete. ", len(self.weight_matrix)**2, " entries")
         print(self.weight_matrix)
-
-    # def build_laplacian_matrix(self):
-    #     
 
     def assign_weight_for_pair(self, i, j):
         if(self.weight_matrix[j, i] == 0):
@@ -162,36 +167,41 @@ class Deformer:
             vert = self.verts[vert_id]
             new_vert = omath.apply_rotation(self.deformation_matrix, vert)
             self.verts_prime[vert_id] = new_vert
-        self.cell_rotations = []
+            for n_id in self.neighbours_of(vert_id):
+                vert = self.verts[n_id]
+                new_vert = omath.apply_rotation(self.deformation_matrix, vert)
+                self.verts_prime[n_id] = new_vert
 
-        for i in range(3):
-            # Calculate rotations
-            # Calculate and apply rotations for each cell TODO MOVE SOMEWHERE ELSE
-            for vert_id in range(0, len(self.verts)):
-                if(self.vert_status[vert_id] == 1):
-                    rotation = self.calculate_rotation_matrix_for_cell(vert_id)
-                else:
-                    rotation = np.identity(3)
-                vert = self.verts[vert_id]
+        for t in range(2):
+            print("Iteration: ", t)
+            self.calculate_cell_rotations()
+            self.apply_cell_rotations()
 
-                self.cell_rotations.append(rotation)
+    def calculate_cell_rotations(self):
+        for vert_id in range(len(self.verts)):
+            if(self.vert_is_deformable(vert_id)):
+                rotation = self.calculate_rotation_matrix_for_cell(vert_id)
+            else:
+                rotation = np.identity(3)
 
-            b_array = []
-            for vert_id in range(len(self.verts)):
-                b_array.append(self.calculate_b_for(vert_id))
-            L = self.laplacian_matrix
-            n = len(self.verts)
-            for vert_id in range(n):
-                if(self.vert_status[vert_id] != 1):
-                    L[vert_id] = 0
-                    L[:, vert_id] = 0
-                    L[vert_id, vert_id] = 1
-                    b_array[vert_id] = self.verts_prime[vert_id]
+            self.cell_rotations[vert_id] = rotation
 
-            p_prime = np.linalg.solve(self.laplacian_matrix, np.array(b_array))
-            self.verts_prime = p_prime
-            print(p_prime)
+    def vert_is_deformable(self, vert_id):
+        return self.vert_status[vert_id] == 1
 
+    def apply_cell_rotations(self):
+        n = len(self.verts)
+
+        b_array = [ self.calculate_b_for(i) for i in range(n) ]
+
+        # Incorporate constraints (10), effecivly erasing non-deformable rows/cols
+        for vert_id in range(n):
+            if(not self.vert_is_deformable(vert_id)):
+                b_array[vert_id] = self.verts_prime[vert_id]
+
+        p_prime = np.linalg.solve(self.laplacian_matrix, np.array(b_array))
+        self.verts_prime = p_prime
+        print(p_prime)
 
     def calculate_rotation_matrix_for_cell(self, vert_id):
         covariance_matrix = self.calculate_covariance_matrix_for_cell(vert_id)

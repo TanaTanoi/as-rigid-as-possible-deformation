@@ -4,7 +4,7 @@ import math
 import face
 import offfile
 import othermath as omath
-
+np.set_printoptions(precision=2)
 # Read file into arrays
 class Deformer:
     def __init__(self, filename):
@@ -54,7 +54,10 @@ class Deformer:
             self.verts_to_face[v3_id].append(i)
 
         print("Generating Edge Matrix")
-        self.edge_matrix = np.diag([ len(self.neighbours_of(x)) for x in range(0, number_of_verticies) ])
+        self.edge_matrix = np.zeros((number_of_verticies, number_of_verticies))
+        # TODO APPLY THIS TO OTHER STUFF ^^
+        for row in range(number_of_verticies):
+            self.edge_matrix[row][row] = self.neighbour_matrix[row].sum()
         print("Generating Laplacian Matrix")
         self.laplacian_matrix = self.edge_matrix - self.neighbour_matrix
 
@@ -109,24 +112,23 @@ class Deformer:
     def build_weight_matrix(self):
         number_of_verticies = len(self.verts)
 
-        self.weight_matrix = [
-            [ 0 for i in range(number_of_verticies) ] for j in range(number_of_verticies)
-        ]
+        self.weight_matrix = np.zeros((number_of_verticies, number_of_verticies))
         for vertex_id in range(number_of_verticies):
             for neighbour_id in self.neighbours_of(vertex_id):
                 self.assign_weight_for_pair(vertex_id, neighbour_id)
         print("Matix complete. ", len(self.weight_matrix)**2, " entries")
+        print(self.weight_matrix)
 
     # def build_laplacian_matrix(self):
     #     
 
     def assign_weight_for_pair(self, i, j):
-        if(self.weight_matrix[j][i] == 0):
+        if(self.weight_matrix[j, i] == 0):
             # If the opposite weight has not been computed, do so
             weightIJ = self.weight_for_pair(i, j)
         else:
-            weightIJ = self.weight_matrix[j][i]
-        self.weight_matrix[i][j] = weightIJ
+            weightIJ = self.weight_matrix[j, i]
+        self.weight_matrix[i, j] = weightIJ
 
     def weight_for_pair(self, i, j):
         local_faces = []
@@ -158,28 +160,46 @@ class Deformer:
         # Apply first deformation
         for vert_id in self.selected_verts:
             vert = self.verts[vert_id]
-            self.verts_prime[vert_id] = omath.apply_rotation(self.deformation_matrix, vert)
+            new_vert = omath.apply_rotation(self.deformation_matrix, vert)
+            self.verts_prime[vert_id] = new_vert
+        self.cell_rotations = []
 
-        self.cell_rotation = []
-        # Calculate and apply rotations for each cell TODO MOVE SOMEWHERE ELSE
-        for vert_id in range(0, len(self.verts)):
-            if(self.vert_status[vert_id] != 0):
-                rotation = self.calculate_rotation_matrix_for_cell(vert_id)
-            else:
-                rotation = np.identity(3)
-            vert = self.verts[vert_id]
+        for i in range(3):
+            # Calculate rotations
+            # Calculate and apply rotations for each cell TODO MOVE SOMEWHERE ELSE
+            for vert_id in range(0, len(self.verts)):
+                if(self.vert_status[vert_id] == 1):
+                    rotation = self.calculate_rotation_matrix_for_cell(vert_id)
+                else:
+                    rotation = np.identity(3)
+                vert = self.verts[vert_id]
 
-            self.cell_rotation.append(rotation)
-        for vert_id in range(0, len(self.verts)):
-            self.verts_prime[vert_id] = omath.apply_rotation(self.cell_rotation[vert_id], self.verts[vert_id])
+                self.cell_rotations.append(rotation)
+
+            b_array = []
+            for vert_id in range(len(self.verts)):
+                b_array.append(self.calculate_b_for(vert_id))
+            L = self.laplacian_matrix
+            n = len(self.verts)
+            for vert_id in range(n):
+                if(self.vert_status[vert_id] != 1):
+                    L[vert_id] = 0
+                    L[:, vert_id] = 0
+                    L[vert_id, vert_id] = 1
+                    b_array[vert_id] = self.verts_prime[vert_id]
+
+            p_prime = np.linalg.solve(self.laplacian_matrix, np.array(b_array))
+            self.verts_prime = p_prime
+            print(p_prime)
+
 
     def calculate_rotation_matrix_for_cell(self, vert_id):
         covariance_matrix = self.calculate_covariance_matrix_for_cell(vert_id)
 
-        U, s, V = np.linalg.svd(covariance_matrix, full_matrices=True)
+        U, s, V_transpose = np.linalg.svd(covariance_matrix, full_matrices=True, compute_uv=True)
         # U, S, V_transpose
         # V_transpose_transpose * U_transpose
-        return V.transpose() * U.transpose()
+        return V_transpose.transpose() * U.transpose()
 
     def calculate_covariance_matrix_for_cell(self, vert_id):
         #s_i = P_i * D_i * P_i_prime_transpose
@@ -187,7 +207,7 @@ class Deformer:
         vert_i_prime = self.verts_prime[vert_id]
 
         neighbour_ids = self.neighbours_of(vert_id)
-        D_i = np.diag(np.array([ self.weight_matrix[vert_id][n_id] for n_id in neighbour_ids ]))
+        D_i = np.diag(np.array([ self.weight_matrix[vert_id, n_id] for n_id in neighbour_ids ]))
         P_i = []
         P_i_prime = []
         for j in neighbour_ids:
@@ -195,14 +215,16 @@ class Deformer:
             P_i.append(vert_i - vert_j)
 
             vert_j_prime = self.verts_prime[j]
+
             P_i_prime.append(vert_i_prime - vert_j_prime)
 
         P_i = np.matrix(P_i).transpose()
-        P_i_prime = np.matrix(P_i_prime)
 
+        P_i_prime = np.matrix(P_i_prime)
         return P_i * D_i * P_i_prime
 
     def output_s_prime_to_file(self):
+        print("Writing to `output.off`")
         f = open('output.off', 'w')
         f.write("OFF\n")
         f.write(str(len(self.verts)) + " " + str(len(self.faces)) + " 0\n")
@@ -214,6 +236,15 @@ class Deformer:
             f.write(face.off_string() + "\n")
         f.close()
         print("Output file to `output.off`")
+
+    def calculate_b_for(self, vert_id):
+        b = np.zeros(3)
+        for n_id in self.neighbours_of(vert_id):
+            w_ij = self.weight_matrix[vert_id, n_id] / 2
+            r_ij = self.cell_rotations[vert_id] + self.cell_rotations[n_id]
+            p_ij = self.verts_prime[vert_id] - self.verts_prime[n_id]
+            b += (w_ij * omath.apply_rotation(r_ij, p_ij))
+        return b
 
 # MAIN
 filename = "data/02-bar-twist/00-bar-original.off"

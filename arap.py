@@ -1,4 +1,5 @@
 import sys
+import os
 import numpy as np
 import math
 import face
@@ -120,6 +121,7 @@ class Deformer:
         return neighbours
 
     def build_weight_matrix(self):
+        print("Generating Weight Matrix")
         self.weight_matrix = np.zeros((self.n, self.n))
         for vertex_id in range(self.n):
             for neighbour_id in self.neighbours_of(vertex_id):
@@ -175,33 +177,47 @@ class Deformer:
             self.apply_cell_rotations()
 
     def calculate_cell_rotations(self):
+        print("Calculating Cell Rotations")
         for vert_id in range(self.n):
             rotation = self.calculate_rotation_matrix_for_cell(vert_id)
-
             self.cell_rotations[vert_id] = rotation
 
     def vert_is_deformable(self, vert_id):
         return self.vert_status[vert_id] == 1
 
     def apply_cell_rotations(self):
-        b_array = [ self.calculate_b_for(i) for i in range(self.n) ]
+        print("Applying Cell Rotations")
 
+        b_array = [ self.calculate_b_for(i) for i in range(self.n) ]
         # Incorporate constraints (10), updating the right hand matrix with values c_k
         for vert_id in range(self.n):
             if(not self.vert_is_deformable(vert_id)):
                 b_array[vert_id] = self.verts_prime[vert_id]
-
+        print(np.matrix(b_array))
+        print('--')
         p_prime = np.linalg.solve(self.laplacian_matrix, np.array(b_array))
-        self.verts_prime = p_prime
+        self.verts_prime += p_prime
+        print("p prime")
         print(p_prime)
 
     def calculate_rotation_matrix_for_cell(self, vert_id):
         covariance_matrix = self.calculate_covariance_matrix_for_cell(vert_id)
 
         U, s, V_transpose = np.linalg.svd(covariance_matrix, full_matrices=True, compute_uv=True)
-        # U, S, V_transpose
+        smallest_singular_value = np.linalg.cond(U, p=2*-1)
+        # the column containing the smallest singular value
+        column = -1
+
+        for row in range(len(U)):
+            for col in range(len(U)):
+                if math.isclose(U[row, col], smallest_singular_value, rel_tol=0.05):
+                    column = col
+        for row in range(len(U)):
+            U[row, column] = U[row, column] * -1
+
+        # U, s, V_transpose
         # V_transpose_transpose * U_transpose
-        return V_transpose.transpose() * U.transpose()
+        return V_transpose.dot(U.transpose())
 
     def calculate_covariance_matrix_for_cell(self, vert_id):
         # s_i = P_i * D_i * P_i_prime_transpose
@@ -273,3 +289,4 @@ if len(selection_filename) > 0:
 d.build_weight_matrix()
 d.apply_deformation(1)
 d.output_s_prime_to_file()
+os.system("say complete")

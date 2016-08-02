@@ -19,7 +19,7 @@ def apply_rotation(rotation_matrix, vector):
     is_4_by_4 = rotation_matrix.size == 16
     if(is_4_by_4):
         vector = np.append(vector, 1)
-    vector = rotation_matrix * np.matrix(vector).transpose()
+    vector = rotation_matrix.dot(np.matrix(vector).transpose())
     vector = vector.transpose()
     if(is_4_by_4):
         # then remove last element

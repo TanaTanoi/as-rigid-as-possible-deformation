@@ -85,18 +85,15 @@ class Deformer:
         # Remove any lines that aren't numbers
         self.vert_status = [int(line) for line in self.vert_status if omath.string_is_int(line)]
 
-        self.laplacian_matrix = self.edge_matrix - self.neighbour_matrix
-
         # Keep track of the IDs of the selected verts (i.e. verts with handles/status == 2)
         self.selected_verts = []
+        self.fixed_verts = []
         for i in range(self.n):
             if self.vert_status[i] == 2:
                 self.selected_verts.append(i)
-            # Apply laplacian constraints (i.e. fixed cells)
-            if(not self.vert_is_deformable(i)):
-                self.laplacian_matrix[i] = 0
-                self.laplacian_matrix[:, i] = 0
-                self.laplacian_matrix[i, i] = 1
+                self.fixed_verts.append(i)
+            elif self.vert_status[i] == 0:
+                self.fixed_verts.append(i)
         assert(len(self.vert_status) == len(self.verts))
 
     # Reads the .def file and stores the inner matrix
@@ -162,6 +159,25 @@ class Deformer:
             cot_theta_sum += omath.cot(theta)
         return cot_theta_sum * 0.5
 
+    def calculate_laplacian_matrix(self):
+        # initial laplacian
+        self.laplacian_matrix = self.edge_matrix - self.neighbour_matrix
+        fixed_verts_num = len(self.fixed_verts)
+        # for each constrained point, add a new row and col
+        new_n = self.n + fixed_verts_num
+        new_matrix = np.zeros((new_n, new_n))
+        # Assign old values to new matrix
+        new_matrix[:-fixed_verts_num, :-fixed_verts_num] = self.laplacian_matrix
+        # Add 1s in the row and column associated with the fixed point to constain it
+        # This will increase L by the size of fixed_verts
+        for i in range(fixed_verts_num):
+            new_i = self.n + i
+            vert_id = self.fixed_verts[i]
+            new_matrix[new_i, vert_id] = 1
+            new_matrix[vert_id, new_i] = 1
+
+        self.laplacian_matrix = new_matrix
+
     def apply_deformation(self, iterations):
         print("Length of sel verts", len(self.selected_verts))
         # Apply first deformation
@@ -189,35 +205,32 @@ class Deformer:
         print("Applying Cell Rotations")
 
         b_array = [ self.calculate_b_for(i) for i in range(self.n) ]
-        # Incorporate constraints (10), updating the right hand matrix with values c_k
-        for vert_id in range(self.n):
-            if(not self.vert_is_deformable(vert_id)):
-                b_array[vert_id] = self.verts_prime[vert_id]
+        # This will increase b by the size of fixed_verts
+        for vert_id in self.fixed_verts:
+            b_array.append(self.verts[vert_id])
         print(np.matrix(b_array))
         print('--')
+        print("Laplacian")
+        print(self.laplacian_matrix)
+        print("B")
+        print(np.array(b_array))
         p_prime = np.linalg.solve(self.laplacian_matrix, np.array(b_array))
-        self.verts_prime += p_prime
+
+        # Add the resutling p` to current p`
+        for i in range(len(self.verts)):
+            self.verts_prime[i] = p_prime[i]
         print("p prime")
         print(p_prime)
 
     def calculate_rotation_matrix_for_cell(self, vert_id):
         covariance_matrix = self.calculate_covariance_matrix_for_cell(vert_id)
 
-        U, s, V_transpose = np.linalg.svd(covariance_matrix, full_matrices=True, compute_uv=True)
-        smallest_singular_value = np.linalg.cond(U, p=2*-1)
-        # the column containing the smallest singular value
-        column = -1
-
-        for row in range(len(U)):
-            for col in range(len(U)):
-                if math.isclose(U[row, col], smallest_singular_value, rel_tol=0.05):
-                    column = col
-        for row in range(len(U)):
-            U[row, column] = U[row, column] * -1
+        U, s, V_transpose = np.linalg.svd(covariance_matrix)
 
         # U, s, V_transpose
         # V_transpose_transpose * U_transpose
-        return V_transpose.dot(U.transpose())
+        rotation = V_transpose.transpose().dot(U.transpose())
+        return rotation
 
     def calculate_covariance_matrix_for_cell(self, vert_id):
         # s_i = P_i * D_i * P_i_prime_transpose
@@ -225,21 +238,26 @@ class Deformer:
         vert_i_prime = self.verts_prime[vert_id]
 
         neighbour_ids = self.neighbours_of(vert_id)
-        D_i = np.diag(np.array([ self.weight_matrix[vert_id, n_id] for n_id in neighbour_ids ]))
-        P_i = []
-        P_i_prime = []
-        for j in neighbour_ids:
-            vert_j = self.verts[j]
-            P_i.append(vert_i - vert_j)
+        number_of_neighbours = len(neighbour_ids)
 
-            vert_j_prime = self.verts_prime[j]
+        D_i = np.zeros((number_of_neighbours, number_of_neighbours))
 
-            P_i_prime.append(vert_i_prime - vert_j_prime)
+        P_i =       np.zeros((3, number_of_neighbours))
+        P_i_prime = np.zeros((3, number_of_neighbours))
 
-        P_i = np.matrix(P_i).transpose()
+        for n_i in range(number_of_neighbours):
+            n_id = neighbour_ids[n_i]
 
-        P_i_prime = np.matrix(P_i_prime)
-        return P_i * D_i * P_i_prime
+            vert_j = self.verts[n_id]
+            P_i[:, n_i] = (vert_i - vert_j)
+
+            D_i[n_i, n_i] = self.weight_matrix[vert_id, n_id]
+
+            vert_j_prime = self.verts_prime[n_id]
+            P_i_prime[:, n_i] = (vert_i_prime - vert_j_prime)
+
+        P_i_prime = P_i_prime.transpose()
+        return P_i.dot(D_i.dot(P_i_prime))
 
     def output_s_prime_to_file(self):
         print("Writing to `output.off`")
@@ -255,13 +273,13 @@ class Deformer:
         f.close()
         print("Output file to `output.off`")
 
-    def calculate_b_for(self, vert_id):
+    def calculate_b_for(self, i):
         b = np.zeros(3)
-        for n_id in self.neighbours_of(vert_id):
-            w_ij = self.weight_matrix[vert_id, n_id] / 2
-            r_ij = self.cell_rotations[vert_id] + self.cell_rotations[n_id]
-            p_ij = self.verts_prime[vert_id] - self.verts_prime[n_id]
-            b += (w_ij * omath.apply_rotation(r_ij, p_ij))
+        for j in self.neighbours_of(i):
+            w_ij = self.weight_matrix[i, j] / 2
+            r_ij = self.cell_rotations[i] + self.cell_rotations[j]
+            p_ij = self.verts_prime[i] - self.verts_prime[j]
+            b += (w_ij * r_ij.dot(p_ij))
         return b
 
 # MAIN
@@ -283,10 +301,11 @@ if(argc > 3):
 
 d = Deformer(filename)
 d.read_file()
+d.build_weight_matrix()
 if len(selection_filename) > 0:
     d.read_selection_file(selection_filename)
     d.read_deformation_file(deformation_file)
-d.build_weight_matrix()
+d.calculate_laplacian_matrix()
 d.apply_deformation(1)
 d.output_s_prime_to_file()
 os.system("say complete")

@@ -91,9 +91,9 @@ class Deformer:
         for i in range(self.n):
             if self.vert_status[i] == 2:
                 self.selected_verts.append(i)
-                self.fixed_verts.append(i)
+                self.fixed_verts.append((i, omath.apply_rotation(self.deformation_matrix, self.verts[i])))
             elif self.vert_status[i] == 0:
-                self.fixed_verts.append(i)
+                self.fixed_verts.append((i, self.verts[i]))
         assert(len(self.vert_status) == len(self.verts))
 
     # Reads the .def file and stores the inner matrix
@@ -214,14 +214,18 @@ class Deformer:
 
          # Constraint b points
         for i in range(number_of_fixed_verts):
-            fixed_vert_id = self.fixed_verts[i]
-            b_array[self.n + i] = self.verts_prime[fixed_vert_id]
+            b_array[self.n + i] = self.fixed_verts[i][1]
+
+        print("Printing B")
+        print(b_array)
 
         p_prime = np.linalg.solve(self.laplacian_matrix, b_array)
 
+        # self.verts = self.verts_prime
+
         for i in range(self.n):
-            self.verts = self.verts_prime
             self.verts_prime[i] = p_prime[i]
+
         print("p prime")
         print(p_prime)
 
@@ -232,6 +236,7 @@ class Deformer:
 
         # U, s, V_transpose
         # V_transpose_transpose * U_transpose
+
         rotation = V_transpose.transpose().dot(U.transpose())
         return rotation
 
@@ -260,7 +265,7 @@ class Deformer:
             P_i_prime[:, n_i] = (vert_i_prime - vert_j_prime)
 
         P_i_prime = P_i_prime.transpose()
-        return P_i.dot(D_i.dot(P_i_prime))
+        return P_i.dot(D_i).dot(P_i_prime)
 
     def output_s_prime_to_file(self):
         print("Writing to `output.off`")
@@ -307,8 +312,8 @@ d = Deformer(filename)
 d.read_file()
 d.build_weight_matrix()
 if len(selection_filename) > 0:
-    d.read_selection_file(selection_filename)
     d.read_deformation_file(deformation_file)
+    d.read_selection_file(selection_filename)
 d.calculate_laplacian_matrix()
 d.apply_deformation(1)
 d.output_s_prime_to_file()

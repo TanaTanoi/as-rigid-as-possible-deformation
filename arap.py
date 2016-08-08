@@ -155,7 +155,7 @@ class Deformer:
         for face in local_faces:
             other_vertex_id = face.other_point(i, j)
             vertex_o = self.verts[other_vertex_id]
-            theta = omath.angle_between(vertex_j - vertex_o, vertex_i - vertex_o)
+            theta = omath.angle_between(vertex_i - vertex_o, vertex_j - vertex_o)
             cot_theta_sum += omath.cot(theta)
         return cot_theta_sum * 0.5
 
@@ -204,20 +204,23 @@ class Deformer:
     def apply_cell_rotations(self):
         print("Applying Cell Rotations")
 
-        b_array = [ self.calculate_b_for(i) for i in range(self.n) ]
-        # This will increase b by the size of fixed_verts
-        for vert_id in self.fixed_verts:
-            b_array.append(self.verts[vert_id])
-        print(np.matrix(b_array))
-        print('--')
-        print("Laplacian")
-        print(self.laplacian_matrix)
-        print("B")
-        print(np.array(b_array))
-        p_prime = np.linalg.solve(self.laplacian_matrix, np.array(b_array))
+        # b_array = [ self.calculate_b_for(i) for i in range(self.n) ]
+        number_of_fixed_verts = len(self.fixed_verts)
+        b_array = np.zeros((self.n + number_of_fixed_verts, 3))
 
-        # Add the resutling p` to current p`
-        for i in range(len(self.verts)):
+        # Regular b points
+        for i in range(self.n):
+            b_array[i] = self.calculate_b_for(i)
+
+         # Constraint b points
+        for i in range(number_of_fixed_verts):
+            fixed_vert_id = self.fixed_verts[i]
+            b_array[self.n + i] = self.verts_prime[fixed_vert_id]
+
+        p_prime = np.linalg.solve(self.laplacian_matrix, b_array)
+
+        for i in range(self.n):
+            self.verts = self.verts_prime
             self.verts_prime[i] = p_prime[i]
         print("p prime")
         print(p_prime)
@@ -274,9 +277,10 @@ class Deformer:
         print("Output file to `output.off`")
 
     def calculate_b_for(self, i):
-        b = np.zeros(3)
+        b = np.zeros((1, 3))
         for j in self.neighbours_of(i):
-            w_ij = self.weight_matrix[i, j] / 2
+            w_ij = self.weight_matrix[i, j] / 2.0
+            assert(w_ij > 0)
             r_ij = self.cell_rotations[i] + self.cell_rotations[j]
             p_ij = self.verts_prime[i] - self.verts_prime[j]
             b += (w_ij * r_ij.dot(p_ij))

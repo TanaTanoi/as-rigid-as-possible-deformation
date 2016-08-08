@@ -161,7 +161,12 @@ class Deformer:
 
     def calculate_laplacian_matrix(self):
         # initial laplacian
-        self.laplacian_matrix = self.edge_matrix - self.neighbour_matrix
+        # self.laplacian_matrix = self.edge_matrix - self.neighbour_matrix
+        weight_sum = (np.sum(self.weight_matrix, axis=0) + np.sum(self.weight_matrix, axis=1)) * 0.5
+        weight_sum = np.diag(weight_sum)
+        print("WEIGHT SUM")
+        print(weight_sum)
+        self.laplacian_matrix = weight_sum - self.weight_matrix
         fixed_verts_num = len(self.fixed_verts)
         # for each constrained point, add a new row and col
         new_n = self.n + fixed_verts_num

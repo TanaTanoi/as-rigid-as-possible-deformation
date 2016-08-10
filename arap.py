@@ -8,6 +8,8 @@ import othermath as omath
 np.set_printoptions(precision=2, suppress=True)
 # Read file into arrays
 class Deformer:
+    max_iterations = 100
+
     def __init__(self, filename):
         self.filename = filename
 
@@ -177,25 +179,44 @@ class Deformer:
         # This will increase L by the size of fixed_verts
         for i in range(fixed_verts_num):
             new_i = self.n + i
-            vert_id = self.fixed_verts[i]
+            vert_id = self.fixed_verts[i][0]
             new_matrix[new_i, vert_id] = 1
             new_matrix[vert_id, new_i] = 1
+        print(self.laplacian_matrix)
 
         self.laplacian_matrix = new_matrix
 
     def apply_deformation(self, iterations):
         print("Length of sel verts", len(self.selected_verts))
-        # Apply first deformation
-        for vert_id in self.selected_verts:
-            vert = self.verts[vert_id]
-            new_vert = omath.apply_rotation(self.deformation_matrix, vert)
-            self.verts_prime[vert_id] = new_vert
+
+        if iterations < 1:
+            iterations = self.max_iterations
+
+        self.current_energy = 0
+
+        # initialize b and assign constraints
+        number_of_fixed_verts = len(self.fixed_verts)
+
+        self.b_array = np.zeros((self.n + number_of_fixed_verts, 3))
+         # Constraint b points
+        for i in range(number_of_fixed_verts):
+            self.b_array[self.n + i] = self.fixed_verts[i][1]
 
         # Apply following deformation iterations
         for t in range(iterations):
             print("Iteration: ", t)
+
             self.calculate_cell_rotations()
             self.apply_cell_rotations()
+            iteration_energy = self.calculate_energy()
+            print("Total Energy: ", self.current_energy)
+            if(self.energy_minimized(iteration_energy)):
+                print("Energy was minimized at iteration", t, " with an energy of ", iteration_energy)
+                break
+            self.current_energy = iteration_energy
+
+    def energy_minimized(self, iteration_energy):
+        return math.isclose(iteration_energy, self.current_energy, rel_tol = 0.01)
 
     def calculate_cell_rotations(self):
         print("Calculating Cell Rotations")
@@ -209,30 +230,22 @@ class Deformer:
     def apply_cell_rotations(self):
         print("Applying Cell Rotations")
 
-        # b_array = [ self.calculate_b_for(i) for i in range(self.n) ]
-        number_of_fixed_verts = len(self.fixed_verts)
-        b_array = np.zeros((self.n + number_of_fixed_verts, 3))
-
         # Regular b points
         for i in range(self.n):
-            b_array[i] = self.calculate_b_for(i)
-
-         # Constraint b points
-        for i in range(number_of_fixed_verts):
-            b_array[self.n + i] = self.fixed_verts[i][1]
+            self.b_array[i] = self.calculate_b_for(i)
 
         print("Printing B")
-        print(b_array)
+        print(self.b_array)
 
-        p_prime = np.linalg.solve(self.laplacian_matrix, b_array)
+        p_prime = np.linalg.solve(self.laplacian_matrix, self.b_array)
 
         # self.verts = self.verts_prime
 
         for i in range(self.n):
             self.verts_prime[i] = p_prime[i]
 
-        print("p prime")
-        print(p_prime)
+        # print("p prime")
+        # print(p_prime)
 
     def calculate_rotation_matrix_for_cell(self, vert_id):
         covariance_matrix = self.calculate_covariance_matrix_for_cell(vert_id)
@@ -242,7 +255,11 @@ class Deformer:
         # U, s, V_transpose
         # V_transpose_transpose * U_transpose
 
+
         rotation = V_transpose.transpose().dot(U.transpose())
+        if np.linalg.det(rotation) <= 0:
+            U[:0] *= -1
+            rotation = V_transpose.transpose().dot(U.transpose())
         return rotation
 
     def calculate_covariance_matrix_for_cell(self, vert_id):
@@ -290,17 +307,27 @@ class Deformer:
         b = np.zeros((1, 3))
         for j in self.neighbours_of(i):
             w_ij = self.weight_matrix[i, j] / 2.0
-            assert(w_ij > 0)
             r_ij = self.cell_rotations[i] + self.cell_rotations[j]
-            p_ij = self.verts_prime[i] - self.verts_prime[j]
+            # print(r_ij)
+            p_ij = self.verts[i] - self.verts[j]
             b += (w_ij * r_ij.dot(p_ij))
         return b
-
+    def calculate_energy(self):
+        total_energy = 0
+        for i in range(self.n):
+            neighbours = self.neighbours_of(i)
+            for j in neighbours:
+                w_ij = self.weight_matrix[i, j]
+                e_ij_prime = self.verts_prime[i] - self.verts_prime[j]
+                e_ij = self.verts[i] - self.verts[j]
+                r_i = self.cell_rotations[i]
+                total_energy += w_ij * np.linalg.norm(e_ij_prime - r_i.dot(e_ij))
+        return total_energy
 # MAIN
 filename            = "data/02-bar-twist/00-bar-original.off"
 selection_filename  = "data/02-bar-twist/bar.sel"
 deformation_file    = "data/02-bar-twist/bar.def"
-
+iterations = -1
 argc = len(sys.argv)
 
 if(argc > 1):
@@ -312,6 +339,8 @@ if(argc > 2):
     deformation_file = ""
 if(argc > 3):
     deformation_file = sys.argv[3]
+if(argc > 4):
+    iterations = int(sys.argv[4])
 
 d = Deformer(filename)
 d.read_file()
@@ -320,6 +349,6 @@ if len(selection_filename) > 0:
     d.read_deformation_file(deformation_file)
     d.read_selection_file(selection_filename)
 d.calculate_laplacian_matrix()
-d.apply_deformation(1)
+d.apply_deformation(iterations)
 d.output_s_prime_to_file()
 os.system("say complete")

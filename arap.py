@@ -227,6 +227,22 @@ class Deformer:
     def vert_is_deformable(self, vert_id):
         return self.vert_status[vert_id] == 1
 
+    def precompute_p_i(self):
+        self.P_i_array = []
+        for i in range(self.n):
+            vert_i = self.verts[i]
+            neighbour_ids = self.neighbours_of(i)
+            number_of_neighbours = len(neighbour_ids)
+
+            P_i = np.zeros((3, number_of_neighbours))
+
+            for n_i in range(number_of_neighbours):
+                n_id = neighbour_ids[n_i]
+
+                vert_j = self.verts[n_id]
+                P_i[:, n_i] = (vert_i - vert_j)
+            self.P_i_array.append(P_i)
+
     def apply_cell_rotations(self):
         print("Applying Cell Rotations")
 
@@ -264,7 +280,6 @@ class Deformer:
 
     def calculate_covariance_matrix_for_cell(self, vert_id):
         # s_i = P_i * D_i * P_i_prime_transpose
-        vert_i = self.verts[vert_id]
         vert_i_prime = self.verts_prime[vert_id]
 
         neighbour_ids = self.neighbours_of(vert_id)
@@ -272,14 +287,11 @@ class Deformer:
 
         D_i = np.zeros((number_of_neighbours, number_of_neighbours))
 
-        P_i =       np.zeros((3, number_of_neighbours))
+        P_i =       self.P_i_array[vert_id]
         P_i_prime = np.zeros((3, number_of_neighbours))
 
         for n_i in range(number_of_neighbours):
             n_id = neighbour_ids[n_i]
-
-            vert_j = self.verts[n_id]
-            P_i[:, n_i] = (vert_i - vert_j)
 
             D_i[n_i, n_i] = self.weight_matrix[vert_id, n_id]
 
@@ -349,6 +361,7 @@ if len(selection_filename) > 0:
     d.read_deformation_file(deformation_file)
     d.read_selection_file(selection_filename)
 d.calculate_laplacian_matrix()
+d.precompute_p_i()
 d.apply_deformation(iterations)
 d.output_s_prime_to_file()
 os.system("say complete")

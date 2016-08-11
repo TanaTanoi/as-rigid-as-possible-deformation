@@ -10,6 +10,7 @@ np.set_printoptions(precision=2, suppress=True)
 # Read file into arrays
 class Deformer:
     max_iterations = 100
+    threshold = 1
 
     def __init__(self, filename):
         self.filename = filename
@@ -217,7 +218,7 @@ class Deformer:
             self.current_energy = iteration_energy
 
     def energy_minimized(self, iteration_energy):
-        return math.isclose(iteration_energy, self.current_energy, rel_tol = 0.01)
+        return abs(self.current_energy - iteration_energy)  < self.threshold
 
     def calculate_cell_rotations(self):
         print("Calculating Cell Rotations")

@@ -7,6 +7,19 @@ import face
 import offfile
 import othermath as omath
 np.set_printoptions(precision=2, suppress=True)
+
+SPARSE = False
+
+if SPARSE:
+    import scipy.sparse
+    import scipy.sparse.linalg
+
+    solve   = scipy.sparse.linalg.spsolve
+    matrix  = scipy.sparse.lil_matrix
+else:
+    solve   = np.linalg.solve
+    matrix  = np.zeros
+
 # Read file into arrays
 class Deformer:
     max_iterations = 100
@@ -123,11 +136,12 @@ class Deformer:
 
     def build_weight_matrix(self):
         print("Generating Weight Matrix")
-        self.weight_matrix = np.zeros((self.n, self.n))
+        self.weight_matrix = matrix((self.n, self.n), dtype=np.float)
+        self.weight_sum = matrix((self.n, self.n), dtype=np.float)
+
         for vertex_id in range(self.n):
             for neighbour_id in self.neighbours_of(vertex_id):
                 self.assign_weight_for_pair(vertex_id, neighbour_id)
-        print("Matix complete. ", len(self.weight_matrix)**2, " entries")
         print(self.weight_matrix)
 
     def assign_weight_for_pair(self, i, j):
@@ -136,6 +150,8 @@ class Deformer:
             weightIJ = self.weight_for_pair(i, j)
         else:
             weightIJ = self.weight_matrix[j, i]
+        self.weight_sum[i, i] += weightIJ / 2.0
+        self.weight_sum[j, j] += weightIJ / 2.0
         self.weight_matrix[i, j] = weightIJ
 
     def weight_for_pair(self, i, j):
@@ -166,17 +182,13 @@ class Deformer:
     def calculate_laplacian_matrix(self):
         # initial laplacian
         # self.laplacian_matrix = self.edge_matrix - self.neighbour_matrix
-        weight_sum = (np.sum(self.weight_matrix, axis=0) + np.sum(self.weight_matrix, axis=1)) * 0.5
-        weight_sum = np.diag(weight_sum)
-        print("WEIGHT SUM")
-        print(weight_sum)
-        self.laplacian_matrix = weight_sum - self.weight_matrix
+        self.laplacian_matrix = self.weight_sum - self.weight_matrix
         fixed_verts_num = len(self.fixed_verts)
         # for each constrained point, add a new row and col
         new_n = self.n + fixed_verts_num
-        new_matrix = np.zeros((new_n, new_n))
+        new_matrix = matrix((new_n, new_n), dtype=np.float)
         # Assign old values to new matrix
-        new_matrix[:-fixed_verts_num, :-fixed_verts_num] = self.laplacian_matrix
+        new_matrix[:self.n, :self.n] = self.laplacian_matrix
         # Add 1s in the row and column associated with the fixed point to constain it
         # This will increase L by the size of fixed_verts
         for i in range(fixed_verts_num):
@@ -255,7 +267,7 @@ class Deformer:
         print("Printing B")
         print(self.b_array)
 
-        p_prime = np.linalg.solve(self.laplacian_matrix, self.b_array)
+        p_prime = solve(self.laplacian_matrix, self.b_array)
 
         # self.verts = self.verts_prime
 

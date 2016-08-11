@@ -1,3 +1,4 @@
+import time
 import sys
 import os
 import numpy as np
@@ -336,6 +337,7 @@ class Deformer:
                 total_energy += w_ij * np.linalg.norm(e_ij_prime - r_i.dot(e_ij))
         return total_energy
 # MAIN
+t = time.time()
 filename            = "data/02-bar-twist/00-bar-original.off"
 selection_filename  = "data/02-bar-twist/bar.sel"
 deformation_file    = "data/02-bar-twist/bar.def"
@@ -362,6 +364,9 @@ if len(selection_filename) > 0:
     d.read_selection_file(selection_filename)
 d.calculate_laplacian_matrix()
 d.precompute_p_i()
+print("Precomputation time ", time.time() - t)
+t = time.time()
 d.apply_deformation(iterations)
+print("Total iteration time", time.time() - t)
 d.output_s_prime_to_file()
 os.system("say complete")

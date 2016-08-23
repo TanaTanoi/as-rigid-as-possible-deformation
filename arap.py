@@ -125,7 +125,8 @@ class Deformer:
         print("Generating Weight Matrix")
         self.weight_matrix = np.zeros((self.n, self.n))
         for vertex_id in range(self.n):
-            for neighbour_id in self.neighbours_of(vertex_id):
+            neighbours = self.neighbours_of(vertex_id)
+            for neighbour_id in neighbours:
                 self.assign_weight_for_pair(vertex_id, neighbour_id)
         print("Matix complete. ", len(self.weight_matrix)**2, " entries")
         print(self.weight_matrix)
@@ -319,7 +320,8 @@ class Deformer:
 
     def calculate_b_for(self, i):
         b = np.zeros((1, 3))
-        for j in self.neighbours_of(i):
+        neighbours = self.neighbours_of(i)
+        for j in neighbours:
             w_ij = self.weight_matrix[i, j] / 2.0
             r_ij = self.cell_rotations[i] + self.cell_rotations[j]
             # print(r_ij)

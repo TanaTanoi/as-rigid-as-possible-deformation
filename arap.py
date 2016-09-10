@@ -23,8 +23,11 @@ else:
 # Read file into arrays
 class Deformer:
     max_iterations = 100
+<<<<<<< HEAD
     last_column_negative = np.identity(3)
     last_column_negative[2, 2] = -1;
+=======
+>>>>>>> parent of 337d4f9... Add step for changing last column of U
     threshold = 0.1
 
     def __init__(self, filename):
@@ -201,10 +204,9 @@ class Deformer:
             new_matrix[vert_id, new_i] = 1
         print(self.laplacian_matrix)
 
-        self.laplacian_matrix = (new_matrix)
+        self.laplacian_matrix = new_matrix
 
     def apply_deformation(self, iterations):
-        print("Energy at start: ", self.calculate_energy())
         print("Length of sel verts", len(self.selected_verts))
 
         if iterations < 1:
@@ -292,7 +294,7 @@ class Deformer:
 
         rotation = V_transpose.transpose().dot(U.transpose())
         if np.linalg.det(rotation) <= 0:
-            U = U * self.last_column_negative
+            U[:0] *= -1
             rotation = V_transpose.transpose().dot(U.transpose())
         return rotation
 

@@ -11,6 +11,8 @@ np.set_printoptions(precision=2, suppress=True)
 class Deformer:
     max_iterations = 100
     threshold = 0.1
+    last_column_negative = np.identity(3)
+    last_column_negative[2, 2] = -1;
 
     def __init__(self, filename):
         self.filename = filename
@@ -187,9 +189,10 @@ class Deformer:
             new_matrix[vert_id, new_i] = 1
         print(self.laplacian_matrix)
 
-        self.laplacian_matrix = new_matrix
+        self.laplacian_matrix = (new_matrix)
 
     def apply_deformation(self, iterations):
+        print("Energy at start: ", self.calculate_energy())
         print("Length of sel verts", len(self.selected_verts))
 
         if iterations < 1:
@@ -277,7 +280,7 @@ class Deformer:
 
         rotation = V_transpose.transpose().dot(U.transpose())
         if np.linalg.det(rotation) <= 0:
-            U[:0] *= -1
+            U = U * self.last_column_negative
             rotation = V_transpose.transpose().dot(U.transpose())
         return rotation
 

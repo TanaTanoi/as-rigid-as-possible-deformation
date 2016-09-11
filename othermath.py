@@ -14,6 +14,8 @@ def string_is_int(string):
     except ValueError:
         return False
 
+def inf_norm(matrix):
+    return np.amax(np.abs(matrix))
 # Apply the 4x4 matrix to the 1x3 vector
 def apply_rotation(rotation_matrix, vector):
     is_4_by_4 = rotation_matrix.size == 16

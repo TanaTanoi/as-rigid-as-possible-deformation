@@ -28,7 +28,7 @@ class Deformer:
     threshold = 0.001
     def __init__(self, filename):
         self.filename = filename
-        self.POWER = 8
+        self.POWER = float('Inf')
 
     def read_file(self):
         fr = offfile.OffFile(self.filename)
@@ -349,9 +349,6 @@ class Deformer:
             total_energy += self.energy_of_cell(i)
         return total_energy
 
-    def power(x):
-        x ** 2
-
     def energy_of_cell(self, i):
         neighbours = self.neighbours_of(i)
         total_energy = 0
@@ -361,9 +358,13 @@ class Deformer:
             e_ij = self.verts[i] - self.verts[j]
             r_i = self.cell_rotations[i]
             value = e_ij_prime - r_i.dot(e_ij)
-            norm_power = np.power(value, self.POWER)
+            if(self.POWER == float('Inf')):
+                norm_power = omath.inf_norm(value)
+            else:
+                norm_power = np.power(value, self.POWER)
+                norm_power = np.sum(norm_power)
             # total_energy += w_ij * np.linalg.norm(, ord=self.POWER) ** self.POWER
-            total_energy += w_ij * np.sum(norm_power)
+            total_energy += w_ij * norm_power
         return total_energy
 
     def hex_color_for_energy(self, energy, max_energy):

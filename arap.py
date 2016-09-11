@@ -6,6 +6,8 @@ import math
 import face
 import offfile
 import othermath as omath
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 np.set_printoptions(precision=2, suppress=True)
 
 SPARSE = False
@@ -23,7 +25,7 @@ else:
 # Read file into arrays
 class Deformer:
     max_iterations = 100
-    threshold = 0.1
+    threshold = 0.001
     def __init__(self, filename):
         self.filename = filename
         self.POWER = 2
@@ -56,7 +58,7 @@ class Deformer:
             self.verts_prime.append(np.array([x, y, z]))
 
             self.verts_to_face.append([])
-
+        self.verts_prime = np.asmatrix(self.verts_prime)
         self.neighbour_matrix = np.zeros((self.n, self.n))
 
         print("Generating Adjacencies")
@@ -225,9 +227,9 @@ class Deformer:
             self.apply_cell_rotations()
             iteration_energy = self.calculate_energy()
             print("Total Energy: ", self.current_energy)
-            if(self.energy_minimized(iteration_energy)):
-                print("Energy was minimized at iteration", t, " with an energy of ", iteration_energy)
-                break
+            # if(self.energy_minimized(iteration_energy)):
+            #     print("Energy was minimized at iteration", t, " with an energy of ", iteration_energy)
+            #     break
             self.current_energy = iteration_energy
 
     def energy_minimized(self, iteration_energy):
@@ -344,14 +346,46 @@ class Deformer:
     def calculate_energy(self):
         total_energy = 0
         for i in range(self.n):
-            neighbours = self.neighbours_of(i)
-            for j in neighbours:
-                w_ij = self.weight_matrix[i, j]
-                e_ij_prime = self.verts_prime[i] - self.verts_prime[j]
-                e_ij = self.verts[i] - self.verts[j]
-                r_i = self.cell_rotations[i]
-                total_energy += w_ij * np.linalg.norm(e_ij_prime - r_i.dot(e_ij), ord=self.POWER) ** self.POWER
+            total_energy += self.energy_of_cell(i)
         return total_energy
+
+    def energy_of_cell(self, i):
+        neighbours = self.neighbours_of(i)
+        total_energy = 0
+        for j in neighbours:
+            w_ij = self.weight_matrix[i, j]
+            e_ij_prime = self.verts_prime[i] - self.verts_prime[j]
+            e_ij = self.verts[i] - self.verts[j]
+            r_i = self.cell_rotations[i]
+            total_energy += w_ij * np.linalg.norm(e_ij_prime - r_i.dot(e_ij), ord=self.POWER) ** self.POWER
+        return total_energy
+
+    def hex_energy_color_for_cell(self, i, max_energy):
+        e_i = self.energy_of_cell(i)
+        relative_energy = (e_i / max_energy) * 255
+        relative_energy = int(relative_energy)
+        red = hex(relative_energy)[2:]
+        blue = hex(255 - relative_energy)[2:]
+        if len(red) == 1:
+            red = "0" + red
+        if len(blue) == 1:
+            blue = "0" + blue
+        return "#" + red + "00" + blue
+
+    def hex_color_array(self):
+        energies = [ self.energy_of_cell(i) for i in range(self.n) ]
+        max_value = np.amax(energies)
+        return [ self.hex_energy_color_for_cell(i, max_value) for i in range(self.n) ]
+    def show_graph(self):
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+        xs = np.squeeze(np.asarray(self.verts_prime[:, 0]))
+        ys = np.squeeze(np.asarray(self.verts_prime[:, 1]))
+        zs = np.squeeze(np.asarray(self.verts_prime[:, 2]))
+        color = self.hex_color_array()
+        # Axes3D.scatter(xs, ys, zs=zs, zdir='z', s=1)#, c=None, depthshade=True, *args, **kwargs)
+        ax.scatter(xs, ys, zs, c=color)
+        plt.show()
 # MAIN
 t = time.time()
 filename            = "data/02-bar-twist/00-bar-original.off"
@@ -385,4 +419,5 @@ t = time.time()
 d.apply_deformation(iterations)
 print("Total iteration time", time.time() - t)
 d.output_s_prime_to_file()
-os.system("say complete")
+d.show_graph()
+# os.system("say complete")

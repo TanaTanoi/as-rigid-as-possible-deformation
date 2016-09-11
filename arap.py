@@ -322,9 +322,9 @@ class Deformer:
         print("Writing to `output.off`")
         f = open('output.off', 'w')
         f.write("OFF\n")
-        f.write(str(len(self.verts)) + " " + str(len(self.faces)) + " 0\n")
+        f.write(str(self.n) + " " + str(len(self.faces)) + " 0\n")
         for vert in self.verts_prime:
-            for i in vert:
+            for i in np.nditer(vert):
                 f.write(str(i) + " ")
             f.write("\n")
         for face in self.faces:

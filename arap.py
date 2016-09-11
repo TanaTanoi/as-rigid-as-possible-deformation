@@ -28,7 +28,7 @@ class Deformer:
     threshold = 0.001
     def __init__(self, filename):
         self.filename = filename
-        self.POWER = 2
+        self.POWER = 8
 
     def read_file(self):
         fr = offfile.OffFile(self.filename)
@@ -349,6 +349,9 @@ class Deformer:
             total_energy += self.energy_of_cell(i)
         return total_energy
 
+    def power(x):
+        x ** 2
+
     def energy_of_cell(self, i):
         neighbours = self.neighbours_of(i)
         total_energy = 0
@@ -357,13 +360,15 @@ class Deformer:
             e_ij_prime = self.verts_prime[i] - self.verts_prime[j]
             e_ij = self.verts[i] - self.verts[j]
             r_i = self.cell_rotations[i]
-            total_energy += w_ij * np.linalg.norm(e_ij_prime - r_i.dot(e_ij), ord=self.POWER) ** self.POWER
+            value = e_ij_prime - r_i.dot(e_ij)
+            norm_power = np.power(value, self.POWER)
+            # total_energy += w_ij * np.linalg.norm(, ord=self.POWER) ** self.POWER
+            total_energy += w_ij * np.sum(norm_power)
         return total_energy
 
-    def hex_energy_color_for_cell(self, i, max_energy):
-        e_i = self.energy_of_cell(i)
-        relative_energy = (e_i / max_energy) * 255
-        relative_energy = int(relative_energy)
+    def hex_color_for_energy(self, energy, max_energy):
+        relative_energy = (energy / max_energy) * 255
+        relative_energy = max(0, min(int(relative_energy), 255))
         red = hex(relative_energy)[2:]
         blue = hex(255 - relative_energy)[2:]
         if len(red) == 1:
@@ -375,7 +380,8 @@ class Deformer:
     def hex_color_array(self):
         energies = [ self.energy_of_cell(i) for i in range(self.n) ]
         max_value = np.amax(energies)
-        return [ self.hex_energy_color_for_cell(i, max_value) for i in range(self.n) ]
+        return [ self.hex_color_for_energy(energy, max_value) for energy in energies ]
+
     def show_graph(self):
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')

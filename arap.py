@@ -23,15 +23,10 @@ else:
 # Read file into arrays
 class Deformer:
     max_iterations = 100
-<<<<<<< HEAD
-    last_column_negative = np.identity(3)
-    last_column_negative[2, 2] = -1;
-=======
->>>>>>> parent of 337d4f9... Add step for changing last column of U
     threshold = 0.1
-
     def __init__(self, filename):
         self.filename = filename
+        self.POWER = 2
 
     def read_file(self):
         fr = offfile.OffFile(self.filename)
@@ -156,8 +151,8 @@ class Deformer:
             weightIJ = self.weight_for_pair(i, j)
         else:
             weightIJ = self.weight_matrix[j, i]
-        self.weight_sum[i, i] += weightIJ / 2.0
-        self.weight_sum[j, j] += weightIJ / 2.0
+        self.weight_sum[i, i] += weightIJ * 0.5
+        self.weight_sum[j, j] += weightIJ * 0.5
         self.weight_matrix[i, j] = weightIJ
 
     def weight_for_pair(self, i, j):
@@ -175,7 +170,7 @@ class Deformer:
         vertex_i = self.verts[i]
         vertex_j = self.verts[j]
 
-        # weight equation: 0.5 * (cot(alpha) + cot(beta)
+        # weight equation: 0.5 * (cot(alpha) + cot(beta))
 
         cot_theta_sum = 0
         for face in local_faces:
@@ -209,7 +204,7 @@ class Deformer:
     def apply_deformation(self, iterations):
         print("Length of sel verts", len(self.selected_verts))
 
-        if iterations < 1:
+        if iterations < 0:
             iterations = self.max_iterations
 
         self.current_energy = 0
@@ -355,7 +350,7 @@ class Deformer:
                 e_ij_prime = self.verts_prime[i] - self.verts_prime[j]
                 e_ij = self.verts[i] - self.verts[j]
                 r_i = self.cell_rotations[i]
-                total_energy += w_ij * np.linalg.norm(e_ij_prime - r_i.dot(e_ij))
+                total_energy += w_ij * np.linalg.norm(e_ij_prime - r_i.dot(e_ij), ord=self.POWER) ** self.POWER
         return total_energy
 # MAIN
 t = time.time()

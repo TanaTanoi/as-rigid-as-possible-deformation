@@ -28,7 +28,7 @@ class Deformer:
     threshold = 0.001
     def __init__(self, filename):
         self.filename = filename
-        self.POWER = float('Inf')
+        self.POWER = 2
 
     def read_file(self):
         fr = offfile.OffFile(self.filename)
@@ -214,17 +214,19 @@ class Deformer:
         # initialize b and assign constraints
         number_of_fixed_verts = len(self.fixed_verts)
 
-        self.b_array = np.zeros((self.n + number_of_fixed_verts, 3))
-         # Constraint b points
-        for i in range(number_of_fixed_verts):
-            self.b_array[self.n + i] = self.fixed_verts[i][1]
-
+        # self.b_array = np.zeros((self.n + number_of_fixed_verts, 3))
+        #  # Constraint b points
+        # for i in range(number_of_fixed_verts):
+        #     self.b_array[self.n + i] = self.fixed_verts[i][1]
+        self.manually_apply_def() # For gradient descent
+        print("Starting Energy: ", self.calculate_energy())
         # Apply following deformation iterations
         for t in range(iterations):
             print("Iteration: ", t)
 
             self.calculate_cell_rotations()
-            self.apply_cell_rotations()
+            # self.apply_cell_rotations()
+            self.gradient_apply()
             iteration_energy = self.calculate_energy()
             print("Total Energy: ", self.current_energy)
             # if(self.energy_minimized(iteration_energy)):
@@ -238,7 +240,10 @@ class Deformer:
     def calculate_cell_rotations(self):
         print("Calculating Cell Rotations")
         for vert_id in range(self.n):
-            rotation = self.calculate_rotation_matrix_for_cell(vert_id)
+            if(self.vert_is_deformable(vert_id)):
+                rotation = self.calculate_rotation_matrix_for_cell(vert_id)
+            else:
+                rotation = np.zeros((3,3))
             self.cell_rotations[vert_id] = rotation
 
     def vert_is_deformable(self, vert_id):
@@ -332,16 +337,36 @@ class Deformer:
         f.close()
         print("Output file to `output.off`")
 
+    def gradient_apply(self):
+        gradient_values = np.zeros((self.n, 3))
+        gamma = 0.01
+        for vert_id in range(len(self.verts)):
+            neighbours = self.neighbours_of(vert_id)
+            total = 0
+            for n_id in range(len(neighbours)):
+                 w_ij = self.weight_matrix[vert_id, n_id]
+                 e_ij_prime = self.verts_prime[vert_id] - self.verts_prime[n_id]
+                 R_ij = self.cell_rotations[vert_id] + self.cell_rotations[n_id]
+                 e_ij = self.verts[vert_id] - self.verts[n_id]
+                 total += (self.POWER * 2) * w_ij * (e_ij_prime - (0.5 * R_ij.dot(e_ij)))
+            gradient_values[vert_id] = total * gamma
+            # print("vert: ", vert_id ," total: " ,total)
+        self.verts_prime -= gradient_values
+
     def calculate_b_for(self, i):
         b = np.zeros((1, 3))
         neighbours = self.neighbours_of(i)
         for j in neighbours:
-            w_ij = self.weight_matrix[i, j] / 2.0
+            w_ij = self.weight_matrix[i, j] * 0.5
             r_ij = self.cell_rotations[i] + self.cell_rotations[j]
             # print(r_ij)
             p_ij = self.verts[i] - self.verts[j]
             b += (w_ij * r_ij.dot(p_ij))
         return b
+
+    def manually_apply_def(self):
+        for vert_id in self.selected_verts:
+            self.verts_prime[vert_id] = omath.apply_rotation(self.deformation_matrix, self.verts[vert_id])
 
     def calculate_energy(self):
         total_energy = 0

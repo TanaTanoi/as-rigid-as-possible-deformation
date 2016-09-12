@@ -25,10 +25,10 @@ else:
 # Read file into arrays
 class Deformer:
     max_iterations = 100
-    threshold = 0.001
     def __init__(self, filename):
         self.filename = filename
         self.POWER = 2
+        self.threshold = 0.01 * pow(10, self.POWER * -1)
 
     def read_file(self):
         fr = offfile.OffFile(self.filename)
@@ -335,20 +335,23 @@ class Deformer:
         for face in self.faces:
             f.write(face.off_string() + "\n")
         f.close()
-        print("Output file to `output.off`")
+        print("Output file to `" + filename + "`")
 
     def gradient_apply(self):
         gradient_values = np.zeros((self.n, 3))
         gamma = 0.01
-        for vert_id in range(len(self.verts)):
+        for vert_id in range(self.n):
             neighbours = self.neighbours_of(vert_id)
             total = 0
-            for n_id in range(len(neighbours)):
+            if(not self.vert_is_deformable(vert_id)):
+                continue
+            for n_id in neighbours:
                  w_ij = self.weight_matrix[vert_id, n_id]
                  e_ij_prime = self.verts_prime[vert_id] - self.verts_prime[n_id]
                  R_ij = self.cell_rotations[vert_id] + self.cell_rotations[n_id]
                  e_ij = self.verts[vert_id] - self.verts[n_id]
-                 total += (self.POWER * 2) * w_ij * (e_ij_prime - (0.5 * R_ij.dot(e_ij)))
+                 inner =  np.power(e_ij_prime - (0.5 * R_ij.dot(e_ij)), self.POWER - 1)
+                 total += (self.POWER * 2) * w_ij * inner
             gradient_values[vert_id] = total * gamma
             # print("vert: ", vert_id ," total: " ,total)
         self.verts_prime -= gradient_values

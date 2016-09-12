@@ -29,6 +29,7 @@ class Deformer:
         return self.POWER == float("Inf")
 
     def __init__(self, filename):
+        self.gd = False
         self.filename = filename
         self.POWER = float("Inf")
         if(self.inf_power):
@@ -222,12 +223,13 @@ class Deformer:
 
         # initialize b and assign constraints
         number_of_fixed_verts = len(self.fixed_verts)
-
-        # self.b_array = np.zeros((self.n + number_of_fixed_verts, 3))
-        #  # Constraint b points
-        # for i in range(number_of_fixed_verts):
-        #     self.b_array[self.n + i] = self.fixed_verts[i][1]
-        self.manually_apply_def() # For gradient descent
+        if(self.gd):
+            self.manually_apply_def() # For gradient descent
+        else:
+            self.b_array = np.zeros((self.n + number_of_fixed_verts, 3))
+             # Constraint b points
+            for i in range(number_of_fixed_verts):
+                self.b_array[self.n + i] = self.fixed_verts[i][1]
         self.current_energy = self.calculate_energy()
         print("Starting Energy: ", self.current_energy)
         # Apply following deformation iterations
@@ -235,8 +237,10 @@ class Deformer:
             print("Iteration: ", t)
 
             self.calculate_cell_rotations()
-            # self.apply_cell_rotations()
-            self.gradient_apply()
+            if(self.gd):
+                self.gradient_apply()
+            else:
+                self.apply_cell_rotations()
             iteration_energy = self.calculate_energy()
             print("Total Energy: ", self.current_energy)
             if(self.energy_minimized(iteration_energy)):
@@ -335,7 +339,10 @@ class Deformer:
 
     def output_s_prime_to_file(self, name):
         print("Writing to `output.off`")
-        filename = "output_" + name + "_" + str(self.POWER) + ".off"
+        filename = "output_" + name + "_" + str(self.POWER)
+        if(self.gd):
+            filename += "_gd"
+        filename += ".off"
         f = open(filename, 'w')
         f.write("OFF\n")
         f.write(str(self.n) + " " + str(len(self.faces)) + " 0\n")

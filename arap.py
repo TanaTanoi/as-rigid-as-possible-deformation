@@ -24,7 +24,7 @@ else:
 
 # Read file into arrays
 class Deformer:
-    max_iterations = 100
+    max_iterations = 500
     def __init__(self, filename):
         self.gd = False
         self.filename = filename
@@ -280,9 +280,6 @@ class Deformer:
         for i in range(self.n):
             self.b_array[i] = self.calculate_b_for(i)
 
-        print("Printing B")
-        print(self.b_array)
-
         p_prime = solve(self.laplacian_matrix, self.b_array)
 
         # self.verts = self.verts_prime
@@ -336,6 +333,8 @@ class Deformer:
         filename = "output_" + name + "_" + str(self.POWER)
         if(self.gd):
             filename += "_gd"
+        else:
+            filename += "_sk"
         filename += ".off"
         f = open(filename, 'w')
         f.write("OFF\n")
@@ -461,9 +460,10 @@ if len(selection_filename) > 0:
     d.read_selection_file(selection_filename)
 d.calculate_laplacian_matrix()
 d.precompute_p_i()
-print("Precomputation time ", time.time() - t)
+precomp_time = time.time() - t
 t = time.time()
 d.apply_deformation(iterations)
+print("Precomputation time ", precomp_time)
 print("Total iteration time", time.time() - t)
 d.output_s_prime_to_file(filename.split("/")[-1][:-4])
 d.show_graph()

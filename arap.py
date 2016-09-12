@@ -145,12 +145,15 @@ class Deformer:
             neighbours = self.neighbours_of(vertex_id)
             for neighbour_id in neighbours:
                 self.assign_weight_for_pair(vertex_id, neighbour_id)
+                # self.weight_matrix[vertex_id, neighbour_id] = 1
         print(self.weight_matrix)
 
     def assign_weight_for_pair(self, i, j):
         if(self.weight_matrix[j, i] == 0):
             # If the opposite weight has not been computed, do so
             weightIJ = self.weight_for_pair(i, j)
+            # weightIJ = 1
+            # XXX uniform weights are giving more drastic changes in some cases
         else:
             weightIJ = self.weight_matrix[j, i]
         self.weight_sum[i, i] += weightIJ * 0.5
@@ -179,7 +182,7 @@ class Deformer:
             other_vertex_id = face.other_point(i, j)
             vertex_o = self.verts[other_vertex_id]
             theta = omath.angle_between(vertex_i - vertex_o, vertex_j - vertex_o)
-            cot_theta_sum += omath.cot(theta)
+            cot_theta_sum += abs(omath.cot(theta))
         return cot_theta_sum * 0.5
 
     def calculate_laplacian_matrix(self):
@@ -219,7 +222,8 @@ class Deformer:
         # for i in range(number_of_fixed_verts):
         #     self.b_array[self.n + i] = self.fixed_verts[i][1]
         self.manually_apply_def() # For gradient descent
-        print("Starting Energy: ", self.calculate_energy())
+        self.current_energy = self.calculate_energy()
+        print("Starting Energy: ", self.current_energy)
         # Apply following deformation iterations
         for t in range(iterations):
             print("Iteration: ", t)
@@ -229,9 +233,9 @@ class Deformer:
             self.gradient_apply()
             iteration_energy = self.calculate_energy()
             print("Total Energy: ", self.current_energy)
-            # if(self.energy_minimized(iteration_energy)):
-            #     print("Energy was minimized at iteration", t, " with an energy of ", iteration_energy)
-            #     break
+            if(self.energy_minimized(iteration_energy)):
+                print("Energy was minimized at iteration", t, " with an energy of ", iteration_energy)
+                break
             self.current_energy = iteration_energy
 
     def energy_minimized(self, iteration_energy):
@@ -323,9 +327,10 @@ class Deformer:
         P_i_prime = P_i_prime.transpose()
         return P_i.dot(D_i).dot(P_i_prime)
 
-    def output_s_prime_to_file(self):
+    def output_s_prime_to_file(self, name):
         print("Writing to `output.off`")
-        f = open('output.off', 'w')
+        filename = "output_" + name + "_" + str(self.POWER) + ".off"
+        f = open(filename, 'w')
         f.write("OFF\n")
         f.write(str(self.n) + " " + str(len(self.faces)) + " 0\n")
         for vert in self.verts_prime:
@@ -453,6 +458,6 @@ print("Precomputation time ", time.time() - t)
 t = time.time()
 d.apply_deformation(iterations)
 print("Total iteration time", time.time() - t)
-d.output_s_prime_to_file()
+d.output_s_prime_to_file(filename.split("/")[-1][:-4])
 d.show_graph()
 # os.system("say complete")

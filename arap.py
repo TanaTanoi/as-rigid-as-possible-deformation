@@ -213,7 +213,7 @@ class Deformer:
         if iterations < 0:
             iterations = self.max_iterations
 
-        self.current_energy = 0
+        self.current_energy = []
 
         # initialize b and assign constraints
         number_of_fixed_verts = len(self.fixed_verts)
@@ -224,8 +224,8 @@ class Deformer:
              # Constraint b points
             for i in range(number_of_fixed_verts):
                 self.b_array[self.n + i] = self.fixed_verts[i][1]
-        self.current_energy = self.calculate_energy()
-        print("Starting Energy: ", self.current_energy)
+        self.current_energy.append(self.calculate_energy())
+        print("Starting Energy: ", self.current_energy[-1])
         # Apply following deformation iterations
         for t in range(iterations):
             print("Iteration: ", t)
@@ -236,14 +236,14 @@ class Deformer:
             else:
                 self.apply_cell_rotations()
             iteration_energy = self.calculate_energy()
-            print("Total Energy: ", self.current_energy)
+            print("Total Energy: ", self.current_energy[-1])
             if(self.energy_minimized(iteration_energy)):
                 print("Energy was minimized at iteration", t, " with an energy of ", iteration_energy)
                 break
-            self.current_energy = iteration_energy
+            self.current_energy.append(iteration_energy)
 
     def energy_minimized(self, iteration_energy):
-        return abs(self.current_energy - iteration_energy)  < self.threshold
+        return abs(self.current_energy[-1] - iteration_energy)  < self.threshold
 
     def calculate_cell_rotations(self):
         print("Calculating Cell Rotations")
@@ -432,6 +432,22 @@ class Deformer:
         # Axes3D.scatter(xs, ys, zs=zs, zdir='z', s=1)#, c=None, depthshade=True, *args, **kwargs)
         ax.scatter(xs, ys, zs, c=color)
         plt.show()
+
+    def show_energy_graph(self):
+        plt.plot(self.current_energy)
+        plt.ylabel("Energy")
+        plt.xlabel("Iterations")
+        plt.show()
+
+    def show_energy_difference_graph(self):
+        opt = self.current_energy[-1]
+        values = []
+        for i in range(len(self.current_energy) - 1):
+            values.append(abs(self.current_energy[i+1] - opt) / abs(self.current_energy[i] - opt))
+        plt.plot(values)
+        plt.ylabel("Energy Difference")
+        plt.xlabel("Iterations")
+        plt.show()
 # MAIN
 t = time.time()
 filename            = "data/02-bar-twist/00-bar-original.off"
@@ -466,5 +482,7 @@ d.apply_deformation(iterations)
 print("Precomputation time ", precomp_time)
 print("Total iteration time", time.time() - t)
 d.output_s_prime_to_file(filename.split("/")[-1][:-4])
-d.show_graph()
+# d.show_graph()
+d.show_energy_graph()
+d.show_energy_difference_graph()
 # os.system("say complete")

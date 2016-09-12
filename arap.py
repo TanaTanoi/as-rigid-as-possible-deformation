@@ -25,10 +25,16 @@ else:
 # Read file into arrays
 class Deformer:
     max_iterations = 100
+    def inf_power(self):
+        return self.POWER == float("Inf")
+
     def __init__(self, filename):
         self.filename = filename
-        self.POWER = 2
-        self.threshold = 0.01 * pow(10, self.POWER * -1)
+        self.POWER = float("Inf")
+        if(self.inf_power):
+            self.threshold = 0.0001
+        else:
+            self.threshold = 0.01 * pow(10, self.POWER * -1)
 
     def read_file(self):
         fr = offfile.OffFile(self.filename)
@@ -239,7 +245,7 @@ class Deformer:
             self.current_energy = iteration_energy
 
     def energy_minimized(self, iteration_energy):
-        return abs(self.current_energy - iteration_energy)  < self.threshold
+        return self.current_energy - iteration_energy  < self.threshold
 
     def calculate_cell_rotations(self):
         print("Calculating Cell Rotations")
@@ -355,8 +361,13 @@ class Deformer:
                  e_ij_prime = self.verts_prime[vert_id] - self.verts_prime[n_id]
                  R_ij = self.cell_rotations[vert_id] + self.cell_rotations[n_id]
                  e_ij = self.verts[vert_id] - self.verts[n_id]
-                 inner =  np.power(e_ij_prime - (0.5 * R_ij.dot(e_ij)), self.POWER - 1)
-                 total += (self.POWER * 2) * w_ij * inner
+                 inner = e_ij_prime - (0.5 * R_ij.dot(e_ij))
+                 if(self.inf_power):
+                     inner = omath.inf_norm(inner)
+                     total += 4 * w_ij * inner
+                 else:
+                     inner =  np.power(inner, self.POWER - 1)
+                     total += (self.POWER * 2) * w_ij * inner
             gradient_values[vert_id] = total * gamma
             # print("vert: ", vert_id ," total: " ,total)
         self.verts_prime -= gradient_values
@@ -391,7 +402,7 @@ class Deformer:
             e_ij = self.verts[i] - self.verts[j]
             r_i = self.cell_rotations[i]
             value = e_ij_prime - r_i.dot(e_ij)
-            if(self.POWER == float('Inf')):
+            if(self.inf_power):
                 norm_power = omath.inf_norm(value)
             else:
                 norm_power = np.power(value, self.POWER)
